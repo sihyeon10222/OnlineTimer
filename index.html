@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 협업 웹 타이머 | OnlineTimer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Views will be injected here -->
+        <div id="landing-view" class="view">
+            <header>
+                <h1>Online Collaborative Timer</h1>
+                <p>실시간으로 공유하고 함께 보는 타이머</p>
+            </header>
+            <main class="card">
+                <div class="timer-type-selector">
+                    <button id="type-countdown" class="active">카운트다운</button>
+                    <button id="type-stopwatch">스톱워치</button>
+                </div>
+
+                <div id="countdown-settings" class="settings-group">
+                    <div class="countdown-mode-selector">
+                        <button id="mode-duration" class="active">기간 설정</button>
+                        <button id="mode-target">종료 시점 설정</button>
+                    </div>
+
+                    <div id="duration-input-group" class="input-group">
+                        <label for="countdown-minutes">시간 설정 (분)</label>
+                        <input type="number" id="countdown-minutes" value="10" min="1" max="1440">
+                    </div>
+
+                    <div id="target-input-group" class="input-group hidden">
+                        <label>종료 일시 설정</label>
+                        <div class="datetime-picker-custom">
+                            <input type="date" id="target-date">
+                            <div class="time-select-group">
+                                <select id="target-ampm">
+                                    <option value="AM">AM</option>
+                                    <option value="PM">PM</option>
+                                </select>
+                                <input type="number" id="target-hour" min="1" max="12" placeholder="시">
+                                <span>:</span>
+                                <input type="number" id="target-minute" min="0" max="59" placeholder="분">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <button id="create-btn" class="primary-btn">타이머 생성하기</button>
+            </main>
+        </div>
+
+        <div id="timer-view" class="view hidden">
+            <header>
+                <div class="header-left">
+                    <button id="back-to-home" class="icon-btn">←</button>
+                </div>
+                <button id="share-btn" class="secondary-btn">링크 공유</button>
+            </header>
+            <main>
+                <div class="timer-container">
+                    <div id="timer-display" class="timer-display">00:00:00</div>
+                    <div id="timer-type-label" class="type-label">카운트다운</div>
+                </div>
+
+                <div id="controls" class="controls">
+                    <button id="reset-btn" class="control-btn secondary">초기화</button>
+                    <button id="toggle-btn" class="control-btn primary">시작</button>
+                </div>
+                <div id="viewer-controls" class="viewer-message hidden">
+                    <p>호스트가 타이머를 제어하고 있습니다.</p>
+                </div>
+
+                <div class="status-indicator">
+                    <span id="sync-status" class="status-dot"></span>
+                    <span id="sync-text">동기화 중...</span>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script type="module" src="/main.js"></script>
+</body>
+
+</html>

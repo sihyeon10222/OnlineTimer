@@ -1,0 +1,327 @@
+:root {
+    --primary-teal: #008080;
+    --primary-hover: #006666;
+    --bg-white: #ffffff;
+    --bg-gray: #f8fafa;
+    --text-main: #2d3748;
+    --text-secondary: #718096;
+    --border-color: #e2e8f0;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --transition: all 0.2s ease;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-gray);
+    color: var(--text-main);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+#app {
+    width: 100%;
+    max-width: 500px;
+    padding: 20px;
+}
+
+.view {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+header {
+    text-align: center;
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-teal);
+    margin-bottom: 8px;
+}
+
+header p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.card {
+    background: var(--bg-white);
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.timer-type-selector,
+.countdown-mode-selector {
+    display: flex;
+    background: var(--bg-gray);
+    padding: 4px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.timer-type-selector button,
+.countdown-mode-selector button {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: var(--transition);
+}
+
+.timer-type-selector button.active,
+.countdown-mode-selector button.active {
+    background: var(--bg-white);
+    color: var(--primary-teal);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+input[type="number"],
+input[type="date"],
+select {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+    transition: var(--transition);
+    background: white;
+}
+
+input:focus,
+select:focus {
+    border-color: var(--primary-teal);
+    box-shadow: 0 0 0 3px rgba(0, 128, 128, 0.1);
+}
+
+.datetime-picker-custom {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.time-select-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.time-select-group select {
+    flex: 1;
+    min-width: 80px;
+}
+
+.time-select-group input[type="number"] {
+    flex: 2;
+    text-align: center;
+    padding: 12px 8px;
+}
+
+.time-select-group span {
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.primary-btn {
+    background: var(--primary-teal);
+    color: white;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.primary-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.secondary-btn {
+    background: var(--bg-white);
+    color: var(--primary-teal);
+    border: 1px solid var(--primary-teal);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.icon-btn {
+    background: #edf2f7;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    color: var(--text-main);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.icon-btn:hover {
+    background: var(--border-color);
+}
+
+/* Timer View */
+#timer-view header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#room-id-display {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-teal);
+    background: #e6fffa;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid #b2f5ea;
+}
+
+.timer-container {
+    text-align: center;
+    margin: 40px 0;
+}
+
+.timer-display {
+    font-size: 5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--primary-teal);
+    margin-bottom: 8px;
+}
+
+.type-label {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+.controls {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.control-btn {
+    flex: 1;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: var(--transition);
+}
+
+.control-btn.primary {
+    background: var(--primary-teal);
+    color: white;
+}
+
+.control-btn.secondary {
+    background: #edf2f7;
+    color: var(--text-main);
+}
+
+.viewer-message {
+    text-align: center;
+    padding: 16px;
+    background: #ebf8f8;
+    border-radius: 8px;
+    color: var(--primary-teal);
+    font-size: 0.9rem;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #cbd5e0;
+}
+
+.status-dot.online {
+    background: #48bb78;
+}
+
+#sync-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.hidden {
+    display: none !important;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 480px) {
+    .timer-display {
+        font-size: 3.5rem;
+    }
+}
