@@ -118,6 +118,21 @@ select {
     outline: none;
     transition: var(--transition);
     background: white;
+    text-align: center;
+    /* Center text in all numeric-friendly inputs */
+}
+
+/* Remove spin buttons for better centering */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 input:focus,
@@ -281,6 +296,38 @@ select:focus {
     font-size: 0.9rem;
 }
 
+.timer-info {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 12px 0;
+    min-height: 1.2rem;
+    padding: 8px;
+    border-radius: 6px;
+    background: #f1f5f9;
+}
+
+.timer-info.waiting {
+    color: var(--primary-teal);
+    font-weight: 600;
+    background: #e6fffa;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.7;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.7;
+    }
+}
+
 .status-indicator {
     display: flex;
     align-items: center;
@@ -324,4 +371,76 @@ select:focus {
     .timer-display {
         font-size: 3.5rem;
     }
+}
+
+/* Modal Styling */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.share-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.share-option-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    text-align: left;
+    transition: var(--transition);
+}
+
+.share-option-card:hover {
+    border-color: var(--primary-teal);
+    background: #f0fdfa;
+    transform: translateY(-2px);
+}
+
+.share-option-card .icon {
+    font-size: 1.5rem;
+    background: #e6fffa;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.share-option-card .details {
+    display: flex;
+    flex-direction: column;
+}
+
+.share-option-card strong {
+    font-size: 0.95rem;
+}
+
+.share-option-card span {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
 }

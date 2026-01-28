@@ -16,28 +16,34 @@
         <!-- Views will be injected here -->
         <div id="landing-view" class="view">
             <header>
-                <h1>Online Collaborative Timer</h1>
-                <p>실시간으로 공유하고 함께 보는 타이머</p>
+                <h1>Online Timer</h1>
+                <p>실시간 공유 타이머</p>
             </header>
             <main class="card">
                 <div class="timer-type-selector">
-                    <button id="type-countdown" class="active">카운트다운</button>
+                    <button id="type-countdown" class="active">타이머</button>
                     <button id="type-stopwatch">스톱워치</button>
                 </div>
 
                 <div id="countdown-settings" class="settings-group">
                     <div class="countdown-mode-selector">
-                        <button id="mode-duration" class="active">기간 설정</button>
+                        <button id="mode-duration" class="active">시간 설정</button>
                         <button id="mode-target">종료 시점 설정</button>
                     </div>
 
                     <div id="duration-input-group" class="input-group">
-                        <label for="countdown-minutes">시간 설정 (분)</label>
-                        <input type="number" id="countdown-minutes" value="10" min="1" max="1440">
+                        <label>시간 설정</label>
+                        <div class="time-select-group">
+                            <input type="number" id="countdown-hours" value="0" min="0" max="99" placeholder="시">
+                            <span>:</span>
+                            <input type="number" id="countdown-minutes" value="10" min="0" max="59" placeholder="분">
+                            <span>:</span>
+                            <input type="number" id="countdown-seconds" value="0" min="0" max="59" placeholder="초">
+                        </div>
                     </div>
 
                     <div id="target-input-group" class="input-group hidden">
-                        <label>종료 일시 설정</label>
+                        <label>종료 시점 설정</label>
                         <div class="datetime-picker-custom">
                             <input type="date" id="target-date">
                             <div class="time-select-group">
@@ -48,6 +54,33 @@
                                 <input type="number" id="target-hour" min="1" max="12" placeholder="시">
                                 <span>:</span>
                                 <input type="number" id="target-minute" min="0" max="59" placeholder="분">
+                                <span>:</span>
+                                <input type="number" id="target-second" min="0" max="59" placeholder="초" value="00">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="stopwatch-settings" class="settings-group hidden">
+                    <div class="countdown-mode-selector" id="stopwatch-mode-selector">
+                        <button id="sw-mode-immediate" class="active">바로 시작</button>
+                        <button id="sw-mode-target">시작 시점 설정</button>
+                    </div>
+
+                    <div id="sw-target-input-group" class="input-group hidden">
+                        <label>시작 시점 설정</label>
+                        <div class="datetime-picker-custom">
+                            <input type="date" id="sw-target-date">
+                            <div class="time-select-group">
+                                <select id="sw-target-ampm">
+                                    <option value="AM">AM</option>
+                                    <option value="PM">PM</option>
+                                </select>
+                                <input type="number" id="sw-target-hour" min="1" max="12" placeholder="시">
+                                <span>:</span>
+                                <input type="number" id="sw-target-minute" min="0" max="59" placeholder="분">
+                                <span>:</span>
+                                <input type="number" id="sw-target-second" min="0" max="59" placeholder="초" value="00">
                             </div>
                         </div>
                     </div>
@@ -61,7 +94,14 @@
         <div id="timer-view" class="view hidden">
             <header>
                 <div class="header-left">
-                    <button id="back-to-home" class="icon-btn">←</button>
+                    <button id="back-to-home" class="icon-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            style="pointer-events: none;">
+                            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                            <polyline points="9 22 9 12 15 12 15 22" />
+                        </svg>
+                    </button>
                 </div>
                 <button id="share-btn" class="secondary-btn">링크 공유</button>
             </header>
@@ -79,11 +119,39 @@
                     <p>호스트가 타이머를 제어하고 있습니다.</p>
                 </div>
 
+                <div id="timer-info" class="timer-info"></div>
+
                 <div class="status-indicator">
                     <span id="sync-status" class="status-dot"></span>
                     <span id="sync-text">동기화 중...</span>
                 </div>
             </main>
+        </div>
+        <div id="share-modal" class="modal hidden">
+            <div class="modal-content card">
+                <h3>링크 공유하기</h3>
+                <p id="share-subtitle">원하는 공유 방식을 선택하세요.</p>
+
+                <div class="share-options">
+                    <button id="share-online-btn" class="share-option-card">
+                        <div class="icon">🔄</div>
+                        <div class="details">
+                            <strong>실시간 동기화 링크</strong>
+                            <span>생성자의 시작/정지 상태와 실시간으로 연동됩니다.</span>
+                        </div>
+                    </button>
+
+                    <button id="share-standalone-btn" class="share-option-card">
+                        <div class="icon">🕒</div>
+                        <div class="details">
+                            <strong id="share-standalone-label">개별 관전 링크</strong>
+                            <span>생성자 상태와 상관없이 종료/시작 시점 기준으로 계속 작동합니다.</span>
+                        </div>
+                    </button>
+                </div>
+
+                <button id="close-modal-btn" class="secondary-btn">닫기</button>
+            </div>
         </div>
     </div>
     <script type="module" src="/main.js"></script>
