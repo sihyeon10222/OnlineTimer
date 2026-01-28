@@ -22,7 +22,8 @@ body {
     color: var(--text-main);
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    padding-top: 8vh;
     min-height: 100vh;
 }
 
@@ -30,6 +31,7 @@ body {
     width: 100%;
     max-width: 500px;
     padding: 20px;
+    margin-bottom: 40px;
 }
 
 .view {
@@ -109,6 +111,7 @@ label {
 
 input[type="number"],
 input[type="date"],
+input[type="text"],
 select {
     padding: 12px;
     border: 1px solid var(--border-color);
@@ -245,12 +248,31 @@ select:focus {
     margin: 40px 0;
 }
 
+.timer-name-display {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 16px;
+    min-height: 1.5rem;
+}
+
 .timer-display {
     font-size: 5rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--primary-teal);
     margin-bottom: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+}
+
+.timer-ms {
+    font-size: 2rem;
+    color: var(--primary-teal);
+    opacity: 0.7;
+    margin-left: 4px;
+    font-weight: 600;
 }
 
 .type-label {
@@ -275,6 +297,10 @@ select:focus {
     cursor: pointer;
     border: none;
     transition: var(--transition);
+}
+
+.control-btn.full-width {
+    flex: 1 1 100%;
 }
 
 .control-btn.primary {
@@ -443,4 +469,113 @@ select:focus {
 .share-option-card span {
     font-size: 0.75rem;
     color: var(--text-secondary);
+}
+
+/* Timer List Section Styles */
+.timer-list-section {
+    margin: 24px 0;
+}
+
+.timer-list-section h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 16px;
+}
+
+.timer-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.timer-list-item {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: var(--transition);
+}
+
+.timer-list-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: var(--primary-teal);
+}
+
+.timer-list-item.finished {
+    border-color: #e53e3e;
+    background: #fff5f5;
+}
+
+.timer-list-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.timer-list-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timer-list-time {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-teal);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+}
+
+.timer-list-item.finished .timer-list-time {
+    color: #e53e3e;
+}
+
+.timer-list-type {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timer-list-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.timer-list-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-gray);
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.timer-list-btn:hover {
+    background: var(--primary-teal);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.timer-list-btn.delete:hover {
+    background: #e53e3e;
+}
+
+.timer-list-btn svg {
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
 }

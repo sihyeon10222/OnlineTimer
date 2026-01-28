@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>실시간 협업 웹 타이머 | OnlineTimer</title>
+    <title>실시간 공유 웹 타이머 | TimerOnline</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,6 +19,8 @@
                 <h1>Online Timer</h1>
                 <p>실시간 공유 타이머</p>
             </header>
+
+
             <main class="card">
                 <div class="timer-type-selector">
                     <button id="type-countdown" class="active">타이머</button>
@@ -34,11 +36,14 @@
                     <div id="duration-input-group" class="input-group">
                         <label>시간 설정</label>
                         <div class="time-select-group">
-                            <input type="number" id="countdown-hours" value="0" min="0" max="99" placeholder="시">
+                            <input type="number" id="countdown-hours" value="0" min="0" max="99" placeholder="시"
+                                inputmode="numeric">
                             <span>:</span>
-                            <input type="number" id="countdown-minutes" value="10" min="0" max="59" placeholder="분">
+                            <input type="number" id="countdown-minutes" value="10" min="0" max="59" placeholder="분"
+                                inputmode="numeric">
                             <span>:</span>
-                            <input type="number" id="countdown-seconds" value="0" min="0" max="59" placeholder="초">
+                            <input type="number" id="countdown-seconds" value="0" min="0" max="59" placeholder="초"
+                                inputmode="numeric">
                         </div>
                     </div>
 
@@ -51,11 +56,14 @@
                                     <option value="AM">AM</option>
                                     <option value="PM">PM</option>
                                 </select>
-                                <input type="number" id="target-hour" min="1" max="12" placeholder="시">
+                                <input type="number" id="target-hour" min="1" max="12" placeholder="시"
+                                    inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="target-minute" min="0" max="59" placeholder="분">
+                                <input type="number" id="target-minute" min="0" max="59" placeholder="분"
+                                    inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="target-second" min="0" max="59" placeholder="초" value="00">
+                                <input type="number" id="target-second" min="0" max="59" placeholder="초" value="00"
+                                    inputmode="numeric">
                             </div>
                         </div>
                     </div>
@@ -76,19 +84,35 @@
                                     <option value="AM">AM</option>
                                     <option value="PM">PM</option>
                                 </select>
-                                <input type="number" id="sw-target-hour" min="1" max="12" placeholder="시">
+                                <input type="number" id="sw-target-hour" min="1" max="12" placeholder="시"
+                                    inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="sw-target-minute" min="0" max="59" placeholder="분">
+                                <input type="number" id="sw-target-minute" min="0" max="59" placeholder="분"
+                                    inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="sw-target-second" min="0" max="59" placeholder="초" value="00">
+                                <input type="number" id="sw-target-second" min="0" max="59" placeholder="초" value="00"
+                                    inputmode="numeric">
                             </div>
                         </div>
                     </div>
                 </div>
 
 
+                <div class="input-group">
+                    <label>이름 (선택)</label>
+                    <input type="text" id="timer-name-input" placeholder="타이머 이름을 입력하세요" maxlength="30">
+                </div>
+
                 <button id="create-btn" class="primary-btn">타이머 생성하기</button>
             </main>
+
+            <!-- Timer List Section moved to bottom -->
+            <section id="timer-list-section" class="timer-list-section hidden">
+                <h2>내 타이머 목록</h2>
+                <div id="timer-list-container" class="timer-list-container">
+                    <!-- Timer list items will be inserted here -->
+                </div>
+            </section>
         </div>
 
         <div id="timer-view" class="view hidden">
@@ -107,6 +131,7 @@
             </header>
             <main>
                 <div class="timer-container">
+                    <div id="timer-name-display" class="timer-name-display"></div>
                     <div id="timer-display" class="timer-display">00:00:00</div>
                     <div id="timer-type-label" class="type-label">카운트다운</div>
                 </div>
@@ -114,6 +139,7 @@
                 <div id="controls" class="controls">
                     <button id="reset-btn" class="control-btn secondary">초기화</button>
                     <button id="toggle-btn" class="control-btn primary">시작</button>
+                    <button id="change-target-btn" class="control-btn primary hidden">종료 시점 변경</button>
                 </div>
                 <div id="viewer-controls" class="viewer-message hidden">
                     <p>호스트가 타이머를 제어하고 있습니다.</p>
@@ -136,7 +162,7 @@
                     <button id="share-online-btn" class="share-option-card">
                         <div class="icon">🔄</div>
                         <div class="details">
-                            <strong>실시간 동기화 링크</strong>
+                            <strong>실시간 동기화 공유</strong>
                             <span>생성자의 시작/정지 상태와 실시간으로 연동됩니다.</span>
                         </div>
                     </button>
@@ -144,13 +170,42 @@
                     <button id="share-standalone-btn" class="share-option-card">
                         <div class="icon">🕒</div>
                         <div class="details">
-                            <strong id="share-standalone-label">개별 관전 링크</strong>
+                            <strong id="share-standalone-label">링크 공유</strong>
                             <span>생성자 상태와 상관없이 종료/시작 시점 기준으로 계속 작동합니다.</span>
                         </div>
                     </button>
                 </div>
 
                 <button id="close-modal-btn" class="secondary-btn">닫기</button>
+            </div>
+        </div>
+
+        <div id="change-target-modal" class="modal hidden">
+            <div class="modal-content card">
+                <h3>종료 시점 변경</h3>
+                <p>새로운 종료 시점을 설정하세요.</p>
+
+                <div class="datetime-picker-custom" style="margin: 20px 0;">
+                    <input type="date" id="new-target-date">
+                    <div class="time-select-group">
+                        <select id="new-target-ampm">
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                        </select>
+                        <input type="number" id="new-target-hour" min="1" max="12" placeholder="시" inputmode="numeric">
+                        <span>:</span>
+                        <input type="number" id="new-target-minute" min="0" max="59" placeholder="분"
+                            inputmode="numeric">
+                        <span>:</span>
+                        <input type="number" id="new-target-second" min="0" max="59" placeholder="초" value="00"
+                            inputmode="numeric">
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="display: flex; gap: 12px; margin-top: 20px;">
+                    <button id="cancel-change-btn" class="secondary-btn" style="flex: 1;">취소</button>
+                    <button id="confirm-change-btn" class="primary-btn" style="flex: 1;">적용하기</button>
+                </div>
             </div>
         </div>
     </div>
