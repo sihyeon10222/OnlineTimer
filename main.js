@@ -1,6 +1,14 @@
-import { v4 as uuidv4 } from 'uuid';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, update, serverTimestamp } from 'firebase/database';
+
+function generateShortId(length = 6) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
 
 // Firebase Configuration - User should replace this with their own
 const firebaseConfig = {
@@ -25,7 +33,7 @@ try {
 // Generate or retrieve a unique ID for this specific tab instance
 // window.name persists across reloads but is not usually copied to new tabs like sessionStorage is.
 if (!window.name || !window.name.startsWith('OnlineTimer_')) {
-    window.name = 'OnlineTimer_' + uuidv4();
+    window.name = 'OnlineTimer_' + generateShortId(12);
 }
 const tabId = window.name;
 
@@ -118,8 +126,14 @@ const newTargetHour = document.getElementById('new-target-hour');
 const newTargetMinute = document.getElementById('new-target-minute');
 const newTargetSecond = document.getElementById('new-target-second');
 
+// Theme Elements
+const themeToggle = document.getElementById('theme-toggle');
+const sunIcon = document.getElementById('theme-icon-sun');
+const moonIcon = document.getElementById('theme-icon-moon');
+
 // Init
 function init() {
+    initTheme();
     handleRoute();
     window.addEventListener('hashchange', handleRoute);
     setupListeners();
@@ -377,7 +391,7 @@ function showTimer(id) {
 }
 
 async function createTimer() {
-    const id = uuidv4();
+    const id = generateShortId(6);
     state.isCreator = true;
     state.roomId = id;
 
@@ -1302,6 +1316,51 @@ function updateTimerListDisplay() {
             }
         }
     });
+}
+
+// Theme Logic
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+    // 1. Initial Apply: Saved preference has first priority for refresh persistence
+    if (savedTheme) {
+        document.body.classList.toggle('dark-mode', savedTheme === 'dark');
+    } else {
+        // Fallback to system if no manual preference yet
+        document.body.classList.toggle('dark-mode', systemPrefersDark.matches);
+    }
+
+    updateThemeUI();
+
+    // 2. Listen for system theme changes (e.g. OS toggled while app is open)
+    systemPrefersDark.addEventListener('change', (e) => {
+        // ALWAYS follow system changes when they happen
+        const isDark = e.matches;
+        document.body.classList.toggle('dark-mode', isDark);
+        // Update storage so refresh follows this new state
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        updateThemeUI();
+    });
+
+    themeToggle.addEventListener('click', toggleTheme);
+}
+
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    updateThemeUI();
+}
+
+function updateThemeUI() {
+    const isDark = document.body.classList.contains('dark-mode');
+    if (isDark) {
+        sunIcon.classList.remove('hidden');
+        moonIcon.classList.add('hidden');
+    } else {
+        sunIcon.classList.add('hidden');
+        moonIcon.classList.remove('hidden');
+    }
 }
 
 console.log('=== OnlineTimer App Script Loaded ===');

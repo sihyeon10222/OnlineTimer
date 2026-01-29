@@ -8,6 +8,34 @@
     --border-color: #e2e8f0;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --transition: all 0.2s ease;
+    --card-bg: var(--bg-white);
+    --input-bg: #ffffff;
+    --btn-bg: #edf2f7;
+    --info-bg: rgba(241, 245, 249, 0.8);
+    --active-bg: var(--bg-white);
+    --active-text: var(--primary-teal);
+    --accent-red: #fff5f5;
+    --accent-red-text: #e53e3e;
+}
+
+body.dark-mode {
+    --bg-white: #1a202c;
+    --bg-gray: #11141d;
+    --text-main: #f7fafc;
+    --text-secondary: #a0aec0;
+    --border-color: #2d3748;
+    --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+    --input-bg: #2d3748;
+    --btn-bg: #2d3748;
+    --info-bg: rgba(45, 55, 72, 0.8);
+    --active-bg: var(--primary-teal);
+    --active-text: #ffffff;
+    --accent-red: rgba(229, 62, 62, 0.15);
+    --accent-red-text: #fc8181;
+}
+
+body {
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 * {
@@ -119,9 +147,9 @@ header p {
 
 .timer-type-selector button.active,
 .countdown-mode-selector button.active {
-    background: var(--bg-white);
-    color: var(--primary-teal);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: var(--active-bg);
+    color: var(--active-text);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .input-group {
@@ -147,9 +175,9 @@ select {
     font-family: inherit;
     outline: none;
     transition: var(--transition);
-    background: white;
+    background: var(--input-bg);
+    color: var(--text-main);
     text-align: center;
-    /* Center text in all numeric-friendly inputs */
 }
 
 /* Remove spin buttons for better centering */
@@ -225,10 +253,15 @@ select:focus {
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
+    transition: var(--transition);
+}
+
+.secondary-btn:hover {
+    background: var(--btn-bg);
 }
 
 .icon-btn {
-    background: #edf2f7;
+    background: var(--btn-bg);
     border: none;
     font-size: 1rem;
     cursor: pointer;
@@ -240,10 +273,18 @@ select:focus {
     align-items: center;
     justify-content: center;
     transition: var(--transition);
+    flex-shrink: 0;
 }
 
 .icon-btn:hover {
     background: var(--border-color);
+}
+
+.theme-toggle-btn {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 1000;
 }
 
 /* Timer View Header */
@@ -255,7 +296,8 @@ select:focus {
     max-width: 500px;
     /* Bring icons closer together */
     margin: 0 auto;
-    padding: 10px 0;
+    padding: 32px 0 12px 0;
+    /* Increase top padding for better breathing room */
     flex-shrink: 0;
 }
 
@@ -375,7 +417,7 @@ select:focus {
 }
 
 .control-btn.secondary {
-    background: #edf2f7;
+    background: var(--btn-bg);
     color: var(--text-main);
 }
 
@@ -397,7 +439,7 @@ select:focus {
     min-height: 1.2rem;
     padding: 8px 16px;
     border-radius: 6px;
-    background: rgba(241, 245, 249, 0.8);
+    background: var(--info-bg);
     width: fit-content;
 }
 
@@ -499,6 +541,7 @@ select:focus {
     width: 90%;
     max-width: 400px;
     text-align: center;
+    background: var(--bg-white);
 }
 
 .share-options {
@@ -514,27 +557,30 @@ select:focus {
     padding: 16px;
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    background: white;
+    background: var(--bg-white);
     cursor: pointer;
     text-align: left;
     transition: var(--transition);
+    color: var(--text-main);
 }
 
 .share-option-card:hover {
     border-color: var(--primary-teal);
-    background: #f0fdfa;
+    background: var(--info-bg);
     transform: translateY(-2px);
 }
 
 .share-option-card .icon {
     font-size: 1.5rem;
-    background: #e6fffa;
+    background: var(--info-bg);
     width: 48px;
     height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    flex-shrink: 0;
+    /* Prevent icon from squashing */
 }
 
 .share-option-card .details {
@@ -572,7 +618,7 @@ select:focus {
 }
 
 .timer-list-item {
-    background: white;
+    background: var(--bg-white);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 16px;
@@ -588,8 +634,12 @@ select:focus {
 }
 
 .timer-list-item.finished {
-    border-color: #e53e3e;
-    background: #fff5f5;
+    border-color: var(--accent-red-text);
+    background: var(--accent-red);
+}
+
+.timer-list-item.finished .timer-list-time {
+    color: var(--accent-red-text);
 }
 
 .timer-list-info {

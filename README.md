@@ -45,6 +45,7 @@
 ## 💾 Persistence & Storage
 
 -   **Owner Recognition**: 타이머 생성 시 고유 ID를 `ownerRooms` 리스트에 저장하여, 페이지 새로고침 후에도 제어권을 유지할 수 있도록 설계했습니다.
+-   **Friendly Short IDs**: 기존의 긴 UUID 대신 6자리의 영문/숫자 조합 단축 ID 시스템을 도입하여 공유 링크의 가시성과 편의성을 극대화했습니다.
 -   **History Tracking**: `localStorage`를 통해 사용자가 생성하거나 참여했던 최근 타이머 목록을 캐싱하며, 비동기 데이터 fetch를 통해 각 항목의 최신 상태(종료 여부 등)를 실시간 업데이트합니다.
 
 ---
