@@ -7,8 +7,9 @@
 본 프로젝트는 별도의 백엔드 서버 없이 **Firebase Realtime Database**를 Primary Data Store로 사용하는 Serverless 아키텍처를 채택하고 있습니다.
 
 -   **Frontend**: Native DOM API, CSS Variables, `requestAnimationFrame`을 활용한 고성능 렌더링.
--   **Backend**: Firebase Realtime Database를 통한 전역 상태(Global State) 관리 및 Pub/Sub 메커니즘 구현.
+-   **Backend**: Firebase Realtime Database 및 **Gun.js Peer-to-Peer Relay**를 통한 하이브리드 전역 상태 관리.
 -   **Security/Ownership**: `localStorage` 및 `sessionStorage`를 활용한 생성자 권한 검증 모듈.
+-   **Zero-Config Sync**: 별도의 API 키 없이도 전 세계 어디서나 기기간 실시간 동기화가 가능한 Decentralized Sync 메커니즘 탑재.
 
 ## 🔄 State Synchronization Mechanism
 

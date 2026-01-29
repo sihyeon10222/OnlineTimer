@@ -30,6 +30,12 @@ try {
     console.warn("Firebase initialization failed. Using local mode.", e);
 }
 
+// Initialize GunDB for global sync without API keys (By any means necessary)
+const gun = Gun([
+    'https://gun-manhattan.herokuapp.com/gun',
+    'https://relay.peer.ooo/gun'
+]);
+
 // Generate or retrieve a unique ID for this specific tab instance
 // window.name persists across reloads but is not usually copied to new tabs like sessionStorage is.
 if (!window.name || !window.name.startsWith('OnlineTimer_')) {
@@ -587,6 +593,21 @@ function joinRoom(id, params = new URLSearchParams()) {
             }
         };
 
+        // GunDB Synchronization (Cross-device relay)
+        if (!state.isStandalone) {
+            console.log(`[Timer] Joining GunDB relay for room: ${id}`);
+            gun.get('timer_online_v1').get(id).on((data) => {
+                if (data && !state.isCreator) {
+                    // Filter out internal Gun metadata
+                    const { _, ...cleanData } = data;
+                    console.log('[Timer] Received state from GunDB relay');
+                    syncFromRemote(cleanData);
+                    syncStatus.classList.add('online');
+                    document.getElementById('sync-text').textContent = '동기화됨';
+                }
+            });
+        }
+
         const savedState = localStorage.getItem(`timer_state_${id}`);
         if (savedState) {
             console.log('[Timer] Found saved state in localStorage');
@@ -1073,16 +1094,24 @@ function showTimerNotification() {
 }
 
 function broadcastSync() {
+    const syncData = {
+        type: state.type,
+        active: state.timerActive,
+        pauseTime: state.pauseTime,
+        startTime: state.startTime,
+        actualStartTime: state.actualStartTime,
+        duration: state.duration,
+        timerName: state.timerName,
+        tabId: tabId // To identify sender
+    };
+
     if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        update(ref(db, 'timers/' + state.roomId), {
-            type: state.type,
-            active: state.timerActive,
-            pauseTime: state.pauseTime,
-            startTime: state.startTime,
-            actualStartTime: state.actualStartTime,
-            duration: state.duration,
-            timerName: state.timerName
-        });
+        update(ref(db, 'timers/' + state.roomId), syncData);
+    }
+
+    // Always broadcast to GunDB if we are the creator (Cross-device sync without keys)
+    if (state.roomId && state.isCreator) {
+        gun.get('timer_online_v1').get(state.roomId).put(syncData);
     } else {
         // Save state to localStorage for persistence regardless of role
         if (state.roomId) {
