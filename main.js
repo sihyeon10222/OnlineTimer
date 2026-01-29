@@ -511,11 +511,21 @@ function joinRoom(id, params = new URLSearchParams()) {
     state.roomId = id;
     state.isStandalone = params.get('standalone') === 'true';
 
+    // Apply data-rich parameters if present (for standalone/offline support)
+    if (params.has('type')) state.type = params.get('type');
+    if (params.has('active')) state.timerActive = params.get('active') === 'true';
+    if (params.has('pause')) state.pauseTime = parseFloat(params.get('pause'));
+    if (params.has('start')) state.startTime = parseInt(params.get('start'));
+    if (params.has('dur')) state.duration = parseInt(params.get('dur'));
+    if (params.has('name')) state.timerName = params.get('name');
+    if (params.has('act')) state.actualStartTime = parseInt(params.get('act'));
+
     // Ownership check via sessionStorage (scoped to this room/tab)
     const ownerToken = sessionStorage.getItem(`timer_owner_${id}`);
     state.isCreator = ownerToken === tabId;
 
     showTimer(id);
+    updateToggleButton(); // Sync UI with newly loaded state
 
     if (state.isStandalone) {
         viewerControls.classList.add('hidden'); // Hide viewer message in standalone
@@ -790,14 +800,52 @@ async function resetTimer() {
 }
 
 function copyLink(standalone) {
-    const baseUrl = `${window.location.origin}${window.location.pathname}`;
-    let url = `${baseUrl}#/${state.roomId}`;
-
-    if (standalone) {
-        url += `?standalone=true`;
+    if (!standalone && firebaseConfig.apiKey === "DEMO_KEY") {
+        alert('현재 데모 모드입니다. 실시간 동기화 링크를 다른 기기에서 확인하려면 Firebase 설정이 필요합니다. 개별 모드 링크를 사용하시거나 기술 문서를 참고해주세요.');
     }
 
-    navigator.clipboard.writeText(url).then(() => {
+    // Robustly get base URL without hash
+    const baseUrl = window.location.href.split('#')[0].replace(/\/$/, '');
+    let url = `${baseUrl}/#/${state.roomId}`;
+
+    const params = new URLSearchParams();
+    if (standalone) {
+        params.set('standalone', 'true');
+        params.set('type', state.type);
+        params.set('active', state.timerActive);
+        params.set('pause', Math.round(state.pauseTime));
+        params.set('start', state.startTime || 0);
+        params.set('dur', state.duration);
+        params.set('name', state.timerName || '');
+        if (state.actualStartTime) params.set('act', state.actualStartTime);
+    }
+
+    const paramStr = params.toString();
+    if (paramStr) {
+        url += `?${paramStr}`;
+    }
+
+    const performCopy = (text) => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        } else {
+            // Fallback for older browsers or insecure contexts
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            return new Promise((res, rej) => {
+                document.execCommand('copy') ? res() : rej();
+                textArea.remove();
+            });
+        }
+    };
+
+    performCopy(url).then(() => {
         const btn = standalone ? shareStandaloneBtn : shareOnlineBtn;
         const originalText = btn.innerHTML;
         btn.innerHTML = '<strong>복사되었습니다!</strong>';
@@ -805,6 +853,9 @@ function copyLink(standalone) {
             btn.innerHTML = originalText;
             shareModal.classList.add('hidden');
         }, 1500);
+    }).catch(err => {
+        console.error('Failed to copy link:', err);
+        alert('링크 복사에 실패했습니다. 수동으로 복사해주세요: ' + url);
     });
 }
 
