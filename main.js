@@ -905,7 +905,7 @@ function updateDisplay() {
 
     let formatted = '';
     if (d > 0) {
-        formatted += `${d}일 `;
+        formatted += `${d}<span class="timer-day-label">일</span> `;
     }
     formatted += [
         h.toString().padStart(2, '0'),
@@ -917,7 +917,7 @@ function updateDisplay() {
         const ms = Math.floor((Math.abs(displaySeconds) % 1) * 100);
         timerDisplay.innerHTML = `${formatted}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
     } else {
-        timerDisplay.textContent = formatted;
+        timerDisplay.innerHTML = formatted;
     }
 }
 

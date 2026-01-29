@@ -23,22 +23,47 @@ body {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding-top: 8vh;
     min-height: 100vh;
+    overflow-y: auto;
 }
 
 #app {
     width: 100%;
-    max-width: 500px;
-    padding: 20px;
-    margin-bottom: 40px;
+    max-width: 1200px;
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
 }
 
 .view {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    align-items: center;
+    gap: 32px;
     animation: fadeIn 0.3s ease-out;
+    width: 100%;
+    max-width: 500px;
+    /* Bring back to a reasonable card-like width */
+    margin: 40px auto;
+}
+
+#timer-view.view {
+    max-width: 100%;
+    min-height: 100vh;
+    padding: 0 20px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+#timer-view main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
 }
 
 header {
@@ -60,11 +85,13 @@ header p {
 .card {
     background: var(--bg-white);
     padding: 32px;
-    border-radius: 16px;
+    border-radius: 24px;
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
     gap: 24px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .timer-type-selector,
@@ -219,12 +246,17 @@ select:focus {
     background: var(--border-color);
 }
 
-/* Timer View */
+/* Timer View Header */
 #timer-view header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    width: 100%;
+    max-width: 500px;
+    /* Bring icons closer together */
+    margin: 0 auto;
+    padding: 10px 0;
+    flex-shrink: 0;
 }
 
 .header-left {
@@ -245,7 +277,14 @@ select:focus {
 
 .timer-container {
     text-align: center;
-    margin: 40px 0;
+    width: 100%;
+    padding: 0 5%;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
 }
 
 .timer-name-display {
@@ -257,46 +296,73 @@ select:focus {
 }
 
 .timer-display {
-    font-size: 5rem;
-    font-weight: 700;
+    font-size: clamp(2rem, 13vw, 15rem);
+    /* Adjust scaling for safety */
+    font-weight: 900;
     font-variant-numeric: tabular-nums;
     color: var(--primary-teal);
-    margin-bottom: 8px;
+    margin: 10px 0;
     display: flex;
     justify-content: center;
     align-items: baseline;
+    line-height: 1;
+    letter-spacing: -2px;
+    white-space: nowrap;
+    width: 100%;
+    text-align: center;
+    padding: 0 20px;
+    box-sizing: border-box;
 }
 
 .timer-ms {
-    font-size: 2rem;
+    font-size: clamp(1.5rem, 6vw, 2.5rem);
     color: var(--primary-teal);
-    opacity: 0.7;
+    opacity: 0.6;
+    margin-left: 6px;
+    font-weight: 700;
+}
+
+.timer-day-label {
+    font-size: clamp(1.5rem, 6vw, 2.5rem);
+    /* Same as .timer-ms */
+    color: var(--primary-teal);
     margin-left: 4px;
-    font-weight: 600;
+    margin-right: 8px;
+    font-weight: 700;
 }
 
 .type-label {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: var(--text-secondary);
+    margin-top: 16px;
+    /* Add gap between numbers and label */
 }
 
 .controls {
     display: flex;
-    gap: 16px;
-    margin-bottom: 24px;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    width: auto;
+    min-width: 0;
+    margin: 40px auto 20px auto;
+    /* Gap above buttons, push from label */
+    flex-shrink: 0;
+    z-index: 10;
 }
 
 .control-btn {
-    flex: 1;
-    padding: 16px;
-    border-radius: 12px;
-    font-size: 1.1rem;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
     border: none;
     transition: var(--transition);
+    white-space: nowrap;
+    /* Prevent button text from wrapping */
 }
 
 .control-btn.full-width {
@@ -326,11 +392,25 @@ select:focus {
     text-align: center;
     font-size: 0.85rem;
     color: var(--text-secondary);
-    margin: 12px 0;
+    margin: auto auto 12px auto;
+    /* margin-top: auto pushes this and indicator to bottom */
     min-height: 1.2rem;
-    padding: 8px;
+    padding: 8px 16px;
     border-radius: 6px;
-    background: #f1f5f9;
+    background: rgba(241, 245, 249, 0.8);
+    width: fit-content;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: auto;
+    /* Push to the very bottom */
+    padding-bottom: 24px;
+    flex-shrink: 0;
 }
 
 .timer-info.waiting {
@@ -473,7 +553,9 @@ select:focus {
 
 /* Timer List Section Styles */
 .timer-list-section {
-    margin: 24px 0;
+    margin: 32px 0;
+    width: 100%;
+    /* Fill the parent view width */
 }
 
 .timer-list-section h2 {
