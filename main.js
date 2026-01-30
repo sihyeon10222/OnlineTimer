@@ -1492,188 +1492,34 @@ const ogLoading = document.getElementById('og-loading');
 const ogImageWrapper = document.getElementById('og-image-wrapper');
 const ogPreviewImage = document.getElementById('og-preview-image');
 
-// Imgur Client ID (Anonymous uploads)
-const IMGUR_CLIENT_ID = 'f9ae652a9a55e77';
+// Get OG image URL from server API
+function getOGImageUrl() {
+    // Build the compact share data
+    let flags = 0;
+    if (state.type === 'stopwatch') flags |= 1;
+    const mode = state.type === 'countdown' ? state.countdownMode : state.stopwatchMode;
+    if (mode === 'target') flags |= 2;
+    if (state.timerActive) flags |= 4;
 
-// Generate OG Image using Canvas
-function generateOGImage() {
-    return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1200;
-        canvas.height = 630;
-        const ctx = canvas.getContext('2d');
+    const EPOCH = 1735689600000; // 2025-01-01
+    const p = toB64(Math.floor(state.pauseTime * 1000));
+    const s = state.startTime ? toB64(state.startTime - EPOCH) : '';
+    const ts = (state.actualStartTime === state.startTime && state.actualStartTime) ? '-' : (state.actualStartTime ? toB64(state.actualStartTime - EPOCH) : '');
+    const d = (state.duration === state.pauseTime || !state.duration) ? '-' : toB64(Math.floor(state.duration * 1000));
+    const n = encodeURIComponent(state.timerName || '');
 
-        const isDark = document.body.classList.contains('dark-mode');
+    // Payload: [flags],[pause],[start],[actual],[duration],[name]
+    const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
 
-        // Background gradient
-        const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
-        if (isDark) {
-            gradient.addColorStop(0, '#1a202c');
-            gradient.addColorStop(1, '#2d3748');
-        } else {
-            gradient.addColorStop(0, '#e6fffa');
-            gradient.addColorStop(1, '#f0fff4');
-        }
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 1200, 630);
+    // Use the production URL for the API
+    const baseApiUrl = window.location.hostname === 'localhost'
+        ? `${window.location.origin}/api/og`
+        : 'https://timeronline.vercel.app/api/og';
 
-        // Decorative circles
-        ctx.globalAlpha = 0.1;
-        ctx.fillStyle = '#008080';
-        ctx.beginPath();
-        ctx.arc(100, 100, 200, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(1100, 530, 250, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-
-        // Brand name
-        ctx.fillStyle = '#008080';
-        ctx.font = 'bold 36px Inter, system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Online Timer', 600, 80);
-
-        // Timer name
-        const timerName = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
-        ctx.fillStyle = isDark ? '#f7fafc' : '#2d3748';
-        ctx.font = 'bold 42px Inter, system-ui, sans-serif';
-        ctx.fillText(timerName.length > 20 ? timerName.substring(0, 20) + '...' : timerName, 600, 180);
-
-        // Calculate current time
-        let displaySeconds = state.pauseTime;
-        if (state.timerActive && state.startTime) {
-            const now = Date.now();
-            const elapsed = (now - state.startTime) / 1000;
-            if (state.type === 'countdown') {
-                displaySeconds = Math.max(0, state.pauseTime - elapsed);
-            } else {
-                displaySeconds = Math.max(0, state.pauseTime + elapsed);
-            }
-        }
-
-        const totalSeconds = Math.abs(Math.floor(displaySeconds));
-        const d = Math.floor(totalSeconds / 86400);
-        const h = Math.floor((totalSeconds % 86400) / 3600);
-        const m = Math.floor((totalSeconds % 3600) / 60);
-        const s = totalSeconds % 60;
-
-        let timeStr = '';
-        if (d > 0) {
-            timeStr = `${d}일 `;
-        }
-        timeStr += [
-            h.toString().padStart(2, '0'),
-            m.toString().padStart(2, '0'),
-            s.toString().padStart(2, '0')
-        ].join(':');
-
-        // Time display box
-        const boxWidth = 500;
-        const boxHeight = 150;
-        const boxX = (1200 - boxWidth) / 2;
-        const boxY = 230;
-
-        // Box background
-        ctx.fillStyle = isDark ? 'rgba(45, 55, 72, 0.8)' : 'rgba(255, 255, 255, 0.9)';
-        ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 20);
-        ctx.fill();
-
-        // Box border
-        ctx.strokeStyle = '#008080';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // Time text
-        ctx.fillStyle = '#008080';
-        ctx.font = 'bold 72px Inter, system-ui, sans-serif';
-        ctx.fillText(timeStr, 600, boxY + 100);
-
-        // Status info
-        const typeLabel = state.type === 'countdown' ? '타이머' : '스톱워치';
-        let statusLabel = '';
-        if (state.timerActive) {
-            statusLabel = '진행 중';
-        } else if (state.type === 'countdown' && state.pauseTime <= 0) {
-            statusLabel = '종료됨';
-        } else {
-            statusLabel = '일시정지';
-        }
-
-        ctx.fillStyle = isDark ? '#a0aec0' : '#718096';
-        ctx.font = '32px Inter, system-ui, sans-serif';
-        ctx.fillText(`${typeLabel} • ${statusLabel}`, 600, 450);
-
-        // Additional info (end/start time)
-        if (state.startTime) {
-            let infoText = '';
-            if (state.type === 'countdown' && state.timerActive) {
-                const endPoint = new Date(state.startTime + state.pauseTime * 1000);
-                infoText = `종료 예정: ${formatDateTime(endPoint)}`;
-            } else if (state.type === 'stopwatch' && state.actualStartTime) {
-                const startPoint = new Date(state.actualStartTime);
-                infoText = `시작 시간: ${formatDateTime(startPoint)}`;
-            }
-            if (infoText) {
-                ctx.fillStyle = isDark ? '#718096' : '#a0aec0';
-                ctx.font = '24px Inter, system-ui, sans-serif';
-                ctx.fillText(infoText, 600, 510);
-            }
-        }
-
-        // Footer
-        ctx.fillStyle = isDark ? '#4a5568' : '#cbd5e0';
-        ctx.font = '20px Inter, system-ui, sans-serif';
-        ctx.fillText('timeronline.vercel.app', 600, 590);
-
-        // Convert to base64
-        const base64 = canvas.toDataURL('image/png').split(',')[1];
-        resolve(base64);
-    });
+    return `${baseApiUrl}?v=${encodeURIComponent(compact)}`;
 }
 
-function formatDateTime(date) {
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hours = date.getHours();
-    const ampm = hours >= 12 ? '오후' : '오전';
-    const hour12 = hours % 12 || 12;
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${month}/${day} ${ampm} ${hour12}:${minutes}`;
-}
-
-// Upload image to Imgur
-async function uploadToImgur(base64Data) {
-    try {
-        const response = await fetch('https://api.imgur.com/3/image', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                image: base64Data,
-                type: 'base64',
-                name: `og_${Date.now()}_${generateShortId(6)}.png`
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            return { success: true, url: data.data.link };
-        } else {
-            console.error('Imgur upload failed:', data);
-            return { success: false, error: data.data?.error || 'Upload failed' };
-        }
-    } catch (error) {
-        console.error('Imgur upload error:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-// Handle share with OG image generation
+// Handle share with OG image preview from server
 async function handleShareWithOG() {
     // Show preview container with loading
     ogPreviewContainer.classList.remove('hidden');
@@ -1681,35 +1527,23 @@ async function handleShareWithOG() {
     ogImageWrapper.classList.add('hidden');
 
     try {
-        // Generate OG image
-        const base64Image = await generateOGImage();
+        // Get OG image URL from server
+        const ogImageUrl = getOGImageUrl();
 
-        // Upload to Imgur
-        const result = await uploadToImgur(base64Image);
-
-        if (result.success) {
-            // Show the uploaded image
-            ogPreviewImage.src = result.url;
-            ogPreviewImage.onload = () => {
-                ogLoading.classList.add('hidden');
-                ogImageWrapper.classList.remove('hidden');
-            };
-            ogPreviewImage.onerror = () => {
-                // Fallback: show local preview if loading fails
-                ogPreviewImage.src = `data:image/png;base64,${base64Image}`;
-                ogLoading.classList.add('hidden');
-                ogImageWrapper.classList.remove('hidden');
-            };
-        } else {
-            // Show local preview if upload fails
-            console.warn('Using local preview due to upload failure');
-            ogPreviewImage.src = `data:image/png;base64,${base64Image}`;
+        // Load the image from server
+        ogPreviewImage.src = ogImageUrl;
+        ogPreviewImage.onload = () => {
             ogLoading.classList.add('hidden');
             ogImageWrapper.classList.remove('hidden');
-        }
+        };
+        ogPreviewImage.onerror = (e) => {
+            console.error('Failed to load OG image from server:', e);
+            // Hide on error
+            ogLoading.classList.add('hidden');
+            ogPreviewContainer.classList.add('hidden');
+        };
     } catch (error) {
-        console.error('OG image generation error:', error);
-        // Hide preview on error
+        console.error('OG image preview error:', error);
         ogPreviewContainer.classList.add('hidden');
     }
 }
