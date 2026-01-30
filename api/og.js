@@ -1,4 +1,5 @@
 import { ImageResponse } from '@vercel/og';
+import { html } from 'satori-html';
 
 export const config = {
     runtime: 'edge',
@@ -64,62 +65,24 @@ export default async function handler(request) {
 
     const timeStr = formatTime(state.pauseTime);
     const timerName = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
+    const displayName = timerName.length > 20 ? timerName.substring(0, 20) + '...' : timerName;
     const typeLabel = state.type === 'countdown' ? '타이머' : '스톱워치';
     const statusLabel = state.isActive ? '진행 중' : '일시정지';
 
-    return new ImageResponse(
-        {
-            type: 'div',
-            props: {
-                tw: 'flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-teal-100 to-green-100',
-                children: [
-                    {
-                        type: 'div',
-                        props: {
-                            tw: 'text-4xl font-bold text-teal-600 mb-4',
-                            children: 'Online Timer'
-                        }
-                    },
-                    {
-                        type: 'div',
-                        props: {
-                            tw: 'text-5xl font-bold text-gray-800 mb-8',
-                            children: timerName.length > 20 ? timerName.substring(0, 20) + '...' : timerName
-                        }
-                    },
-                    {
-                        type: 'div',
-                        props: {
-                            tw: 'flex items-center justify-center px-16 py-8 bg-white rounded-3xl border-4 border-teal-500',
-                            children: {
-                                type: 'div',
-                                props: {
-                                    tw: 'text-7xl font-black text-teal-600',
-                                    children: timeStr
-                                }
-                            }
-                        }
-                    },
-                    {
-                        type: 'div',
-                        props: {
-                            tw: 'text-3xl text-gray-500 mt-8',
-                            children: `${typeLabel} • ${statusLabel}`
-                        }
-                    },
-                    {
-                        type: 'div',
-                        props: {
-                            tw: 'absolute bottom-8 text-xl text-gray-400',
-                            children: 'timeronlineshare.vercel.app'
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            width: 1200,
-            height: 630,
-        }
-    );
+    const markup = html`
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(135deg, #e6fffa 0%, #f0fff4 100%); font-family: sans-serif;">
+            <div style="font-size: 36px; font-weight: bold; color: #008080; margin-bottom: 20px;">Online Timer</div>
+            <div style="font-size: 42px; font-weight: bold; color: #2d3748; margin-bottom: 30px;">${displayName}</div>
+            <div style="display: flex; align-items: center; justify-content: center; padding: 30px 60px; background: rgba(255,255,255,0.9); border-radius: 20px; border: 3px solid #008080;">
+                <div style="font-size: 72px; font-weight: 900; color: #008080;">${timeStr}</div>
+            </div>
+            <div style="font-size: 32px; color: #718096; margin-top: 30px;">${typeLabel} • ${statusLabel}</div>
+            <div style="position: absolute; bottom: 30px; font-size: 20px; color: #cbd5e0;">timeronlineshare.vercel.app</div>
+        </div>
+    `;
+
+    return new ImageResponse(markup, {
+        width: 1200,
+        height: 630,
+    });
 }
