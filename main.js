@@ -43,7 +43,7 @@ const state = {
     type: 'countdown',
     countdownMode: 'duration', // 'duration' or 'target'
     roomId: null,
-    isCreator: false,
+    isHost: false,
     timerActive: false,
     startTime: null,
     pauseTime: 0,
@@ -55,7 +55,6 @@ const state = {
     actualStartTime: null,
     timerName: '',
     lastIsWaiting: false,
-    isHost: false // Added host role
 };
 
 // UI Elements
@@ -385,7 +384,7 @@ function showLanding() {
     timerView.classList.add('hidden');
     state.timerActive = false;
     state.roomId = null;
-    state.isCreator = false;
+    state.isHost = false;
     setType('countdown'); // Reset to default mode visually and in state
 }
 
@@ -397,7 +396,7 @@ function showTimer(id) {
 
 async function createTimer() {
     const id = generateShortId(6);
-    state.isCreator = true;
+    state.isHost = true;
     state.roomId = id;
 
     let initialSeconds = 0;
@@ -475,7 +474,7 @@ async function createTimer() {
         duration: state.duration,
         timerName: state.timerName,
         countdownMode: state.countdownMode,
-        isCreator: true,
+        isHost: true,
         roomId: id
     };
 
@@ -818,7 +817,7 @@ function updateDisplay() {
     }
 
     // Check if we need to update buttons (e.g. waiting finished)
-    if (state.isCreator && (state.lastIsWaiting !== isWaiting)) {
+    if (state.isHost && (state.lastIsWaiting !== isWaiting)) {
         state.lastIsWaiting = isWaiting;
         updateToggleButton();
     }
@@ -845,21 +844,6 @@ function updateDisplay() {
     } else {
         timerDisplay.innerHTML = formatted;
     }
-}
-
-function stopTimerAtZero() {
-    state.timerActive = false;
-    state.pauseTime = 0;
-    state.startTime = null;
-    updateToggleButton();
-
-    // Play alarm sound
-    playAlarmSound();
-
-    // Show browser notification
-    showTimerNotification();
-
-    broadcastSync();
 }
 
 function playAlarmSound() {
@@ -933,38 +917,6 @@ function showTimerNotification() {
     }
 }
 
-function broadcastSync() {
-    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        update(ref(db, 'timers/' + state.roomId), {
-            type: state.type,
-            active: state.timerActive,
-            pauseTime: state.pauseTime,
-            startTime: state.startTime,
-            actualStartTime: state.actualStartTime,
-            duration: state.duration,
-            timerName: state.timerName
-        });
-    } else {
-        // Save state to localStorage for persistence regardless of role
-        if (state.roomId) {
-            // Only save if we have valid data (e.g. Creator). Values might be null if we are just a viewer who hasn't synced yet.
-            // But broadcastSync is usually called by creator or after sync.
-            // Check if we are creator or standalone-master to avoid overwriting with empty state? 
-            // Actually broadcastSync is called when WE change something.
-            localStorage.setItem(`timer_state_${state.roomId}`, JSON.stringify(getSerializableState()));
-        }
-
-        if (!state.bc) {
-            state.bc = new BroadcastChannel('timer_' + state.roomId);
-        }
-        console.log('[Timer] Broadcasting state via BC:', getSerializableState());
-        try {
-            state.bc.postMessage({ msgType: 'SYNC', state: getSerializableState() });
-        } catch (e) {
-            console.error('[Timer] Failed to post SYNC message:', e);
-        }
-    }
-}
 
 // Timer List Management Functions
 function loadTimerList() {
