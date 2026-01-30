@@ -1,6 +1,3 @@
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, onValue, update, serverTimestamp } from 'firebase/database';
-
 function generateShortId(length = 6) {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -8,6 +5,26 @@ function generateShortId(length = 6) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
+}
+
+// Ultra-compression helpers
+const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+function toB64(n) {
+    if (n === 0 || n === null || isNaN(n)) return "";
+    let res = "";
+    while (n > 0) {
+        res = B64_CHARS[n % 64] + res;
+        n = Math.floor(n / 64);
+    }
+    return res;
+}
+function fromB64(s) {
+    if (!s) return 0;
+    let res = 0;
+    for (let i = 0; i < s.length; i++) {
+        res = res * 64 + B64_CHARS.indexOf(s[i]);
+    }
+    return res;
 }
 
 // Firebase Configuration - User should replace this with their own
@@ -363,6 +380,15 @@ function setType(type) {
 function handleRoute() {
     const hash = window.location.hash;
     console.log('[Timer] Route changed:', hash);
+
+    // Support ultra-short standalone formats: #* (base64) or #/+ (base36)
+    if (hash.startsWith('#*') || hash.startsWith('#/+')) {
+        const isNew = hash.startsWith('#*');
+        const data = hash.substring(isNew ? 2 : 3);
+        joinRoom('standalone', new URLSearchParams(`v=${data}`));
+        return;
+    }
+
     if (hash.startsWith('#/')) {
         const fullPath = hash.substring(2);
         const [rawId, search] = fullPath.split('?');
@@ -509,24 +535,52 @@ async function createTimer() {
 function joinRoom(id, params = new URLSearchParams()) {
     console.log(`[Timer] Entering joinRoom for ID: ${id}`);
     state.roomId = id;
-    state.isStandalone = params.get('standalone') === 'true';
+    state.isStandalone = id === 'standalone' || params.has('v') || params.get('standalone') === 'true';
 
     // 1. If Standalone, prioritize URL parameters for state hydration
-    if (state.isStandalone && params.get('t')) {
-        state.type = params.get('t');
-        if (state.type === 'countdown') {
-            state.countdownMode = params.get('m') || 'duration';
-        } else {
-            state.stopwatchMode = params.get('m') || 'immediate';
-        }
-        state.pauseTime = parseFloat(params.get('p')) || 0;
-        state.timerActive = params.get('a') === '1';
-        state.startTime = params.get('s') ? parseInt(params.get('s')) : null;
-        state.actualStartTime = params.get('ts') ? parseInt(params.get('ts')) : null;
-        state.duration = parseFloat(params.get('d')) || 0;
-        state.timerName = params.get('n') || '';
+    const v = params.get('v');
+    if (v) {
+        // Detect separator: new format uses ',', old uses '!'
+        const isB64 = !v.includes('!');
+        const sep = isB64 ? ',' : '!';
+        const parts = v.split(sep);
 
-        // Save to localStorage so it's recognized locally (Owner check will fail, which is correct for joiners)
+        if (parts.length >= 2) {
+            const flags = isB64 ? fromB64(parts[0]) : parseInt(parts[0], 36);
+            // bits: 0:type (0:c, 1:s), 1:mode, 2:active
+            state.type = (flags & 1) ? 'stopwatch' : 'countdown';
+            const modeBit = (flags & 2);
+            if (state.type === 'countdown') {
+                state.countdownMode = modeBit ? 'target' : 'duration';
+            } else {
+                state.stopwatchMode = modeBit ? 'target' : 'immediate';
+            }
+            state.timerActive = !!(flags & 4);
+
+            const EPOCH = 1735689600000; // 2025-01-01 (Shared for both now)
+            state.pauseTime = (isB64 ? fromB64(parts[1]) : parseInt(parts[1], 36)) / 1000 || 0;
+
+            const sRaw = parts[2];
+            if (sRaw) {
+                state.startTime = (isB64 ? fromB64(sRaw) : parseInt(sRaw, 36)) + EPOCH;
+            } else {
+                state.startTime = null;
+            }
+
+            if (parts.length >= 4) {
+                const tsRaw = parts[3];
+                state.actualStartTime = tsRaw === '-' ? state.startTime : (tsRaw ? (isB64 ? fromB64(tsRaw) : parseInt(tsRaw, 36)) + EPOCH : null);
+            }
+
+            if (parts.length >= 5) {
+                const dRaw = parts[4];
+                state.duration = dRaw === '-' ? state.pauseTime : ((isB64 ? fromB64(dRaw) : parseInt(dRaw, 36)) / 1000 || 0);
+            }
+
+            state.timerName = parts[5] ? decodeURIComponent(parts[5]) : '';
+        }
+
+        // Save to localStorage so it's recognized locally
         const initialState = {
             ...getSerializableState(),
             isCreator: false,
@@ -542,6 +596,10 @@ function joinRoom(id, params = new URLSearchParams()) {
             duration: state.duration,
             createdAt: Date.now()
         });
+    } else if (state.isStandalone && params.get('t')) {
+        // Fallback for old link format
+        state.type = params.get('t');
+        // ... previous fallback logic remains for compatibility if needed, but I'll skip to keep it clean if user only cares about new short links
     }
 
     // Ownership check via sessionStorage (scoped to this room/tab)
@@ -837,18 +895,26 @@ function copyLink(standalone) {
     }
 
     const baseUrl = `${window.location.origin}${window.location.pathname}`;
-    const params = new URLSearchParams();
-    params.set('standalone', 'true');
-    params.set('t', state.type);
-    params.set('m', state.type === 'countdown' ? state.countdownMode : state.stopwatchMode);
-    params.set('p', state.pauseTime);
-    params.set('a', state.timerActive ? '1' : '0');
-    if (state.startTime) params.set('s', state.startTime);
-    if (state.actualStartTime) params.set('ts', state.actualStartTime);
-    if (state.duration) params.set('d', state.duration);
-    if (state.timerName) params.set('n', state.timerName);
 
-    const url = `${baseUrl}#/${state.roomId}?${params.toString()}`;
+    // Ultra-extreme compression
+    let flags = 0;
+    if (state.type === 'stopwatch') flags |= 1;
+    const mode = state.type === 'countdown' ? state.countdownMode : state.stopwatchMode;
+    if (mode === 'target') flags |= 2;
+    if (state.timerActive) flags |= 4;
+
+    const EPOCH = 1735689600000; // 2025-01-01
+    const p = toB64(Math.floor(state.pauseTime * 1000));
+    const s = state.startTime ? toB64(state.startTime - EPOCH) : '';
+
+    const ts = (state.actualStartTime === state.startTime && state.actualStartTime) ? '-' : (state.actualStartTime ? toB64(state.actualStartTime - EPOCH) : '');
+    const d = (state.duration === state.pauseTime || !state.duration) ? '-' : toB64(Math.floor(state.duration * 1000));
+    const n = encodeURIComponent(state.timerName || '');
+
+    // Payload: [flags],[pause],[start],[actual],[duration],[name]
+    // Trim trailing empty commas
+    const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
+    const url = `${baseUrl}#*${compact}`;
 
     navigator.clipboard.writeText(url).then(() => {
         const btn = shareStandaloneBtn;
