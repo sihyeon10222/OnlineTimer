@@ -10,15 +10,15 @@ function generateShortId(length = 6) {
     return result;
 }
 
-// Firebase Configuration
+// Firebase Configuration - User should replace this with their own
 const firebaseConfig = {
-    apiKey: "AIzaSyBhnEFUjgLlG5I_i96wrGk7OCeKgexZjZY",
-    authDomain: "timeronline-57714.firebaseapp.com",
-    projectId: "timeronline-57714",
-    storageBucket: "timeronline-57714.firebasestorage.app",
-    messagingSenderId: "123410833199",
-    appId: "1:123410833199:web:683e8519296ceddfcf8bda",
-    measurementId: "G-9HTJ3CJ5YZ"
+    apiKey: "DEMO_KEY",
+    authDomain: "online-timer-demo.firebaseapp.com",
+    databaseURL: "https://online-timer-demo-default-rtdb.firebaseio.com",
+    projectId: "online-timer-demo",
+    storageBucket: "online-timer-demo.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
 };
 
 // Initialize Firebase (wrapped in try-catch to allow local demo if config is invalid)
@@ -43,7 +43,7 @@ const state = {
     type: 'countdown',
     countdownMode: 'duration', // 'duration' or 'target'
     roomId: null,
-    isHost: false,
+    isCreator: false,
     timerActive: false,
     startTime: null,
     pauseTime: 0,
@@ -54,7 +54,7 @@ const state = {
     stopwatchMode: 'immediate',
     actualStartTime: null,
     timerName: '',
-    lastIsWaiting: false,
+    lastIsWaiting: false
 };
 
 // UI Elements
@@ -368,10 +368,6 @@ function handleRoute() {
         const [rawId, search] = fullPath.split('?');
         const id = rawId.replace(/\/$/, ''); // Strip trailing slash
         const params = new URLSearchParams(search);
-
-        // Host check: ?mode=host
-        state.isHost = params.get('mode') === 'host';
-
         joinRoom(id, params);
     } else {
         showLanding();
@@ -384,7 +380,7 @@ function showLanding() {
     timerView.classList.add('hidden');
     state.timerActive = false;
     state.roomId = null;
-    state.isHost = false;
+    state.isCreator = false;
     setType('countdown'); // Reset to default mode visually and in state
 }
 
@@ -396,7 +392,7 @@ function showTimer(id) {
 
 async function createTimer() {
     const id = generateShortId(6);
-    state.isHost = true;
+    state.isCreator = true;
     state.roomId = id;
 
     let initialSeconds = 0;
@@ -474,7 +470,7 @@ async function createTimer() {
         duration: state.duration,
         timerName: state.timerName,
         countdownMode: state.countdownMode,
-        isHost: true,
+        isCreator: true,
         roomId: id
     };
 
@@ -508,145 +504,151 @@ async function createTimer() {
         createdAt: Date.now()
     });
 
-    // Navigate to local room as host
-    window.location.hash = `/${id}?mode=host`;
+    window.location.hash = `/${id}`;
 }
 function joinRoom(id, params = new URLSearchParams()) {
     console.log(`[Timer] Entering joinRoom for ID: ${id}`);
     state.roomId = id;
     state.isStandalone = params.get('standalone') === 'true';
 
-    // Role-based UI visibility
-    if (state.isHost) {
+    // Ownership check via sessionStorage (scoped to this room/tab)
+    const ownerToken = sessionStorage.getItem(`timer_owner_${id}`);
+    state.isCreator = ownerToken === tabId;
+
+    showTimer(id);
+
+    if (state.isStandalone) {
+        viewerControls.classList.add('hidden'); // Hide viewer message in standalone
+        syncStatus.title = "Standalone Mode (Not synced)";
+        shareOnlineBtn.classList.add('hidden'); // Hide sync link option in standalone mode
+        shareSubtitle.classList.add('hidden'); // Hide subtitle when only one option exists
+    } else {
+        shareOnlineBtn.classList.remove('hidden');
+        shareSubtitle.classList.remove('hidden');
+        const typeName = state.type === 'countdown' ? '타이머' : '스톱워치';
+        shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
+    }
+
+    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
+        const timerRef = ref(db, 'timers/' + id);
+        const unsubscribe = onValue(timerRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                state.remoteState = data;
+                syncFromRemote(data);
+                syncStatus.classList.add('online');
+
+                if (state.isStandalone) {
+                    // One-time sync for standalone
+                    unsubscribe();
+                    syncStatus.classList.remove('online');
+                    syncStatus.title = "Standalone Mode (Not synced)";
+                }
+            } else {
+                if (!state.isCreator) {
+                    alert('존재하지 않는 타이머입니다.');
+                    window.location.hash = '';
+                }
+            }
+        });
+    } else {
+        // Local mode fallback via BroadcastChannel
+        console.log(`[Timer] Joining room ${id} in local mode (standalone: ${state.isStandalone})`);
+
+        if (state.bc) state.bc.close();
+        state.bc = new BroadcastChannel('timer_' + id);
+
+        state.bc.onmessage = (event) => {
+            console.log('[Timer] Received BC message:', event.data.msgType);
+            if (event.data.msgType === 'SYNC') {
+                syncFromRemote(event.data.state);
+                syncStatus.classList.add('online');
+                document.getElementById('sync-text').textContent = state.isStandalone ? '개별 모드' : '동기화됨';
+
+                if (state.isStandalone) {
+                    console.log('[Timer] Standalone sync complete, closing channel.');
+                    state.bc.close();
+                    state.bc = null;
+                    syncStatus.classList.remove('online');
+                }
+            } else if (event.data.msgType === 'REQUEST_STATE' && state.isCreator) {
+                console.log('[Timer] Host received REQUEST_STATE, broadcasting...');
+                broadcastSync();
+            }
+        };
+
+        const savedState = localStorage.getItem(`timer_state_${id}`);
+        if (savedState) {
+            console.log('[Timer] Found saved state in localStorage');
+            const data = JSON.parse(savedState);
+            syncFromRemote(data);
+            syncStatus.classList.add('online');
+            document.getElementById('sync-text').textContent = state.isStandalone ? '개별 모드' : '동기화됨';
+            // Even if we have saved state, standalone might want to hear the LATEST from host at least once
+            // So we don't close the channel immediately here. It will be closed after the first sync.
+        }
+
+        if (!state.isCreator) {
+            console.log('[Timer] Requesting state from host...');
+            try {
+                state.bc.postMessage({ msgType: 'REQUEST_STATE' });
+                // Backup request after 1.5 seconds if still nothing
+                setTimeout(() => {
+                    if (document.getElementById('sync-text').textContent.includes('대기')) {
+                        console.log('[Timer] Still waiting for sync, retrying request...');
+                        state.bc.postMessage({ msgType: 'REQUEST_STATE' });
+                    }
+                }, 1500);
+            } catch (e) {
+                console.error('[Timer] Failed to send REQUEST_STATE:', e);
+            }
+        }
+
+        if (!savedState && !state.isStandalone) {
+            syncStatus.classList.remove('online');
+            document.getElementById('sync-text').textContent = '동기화 대기 중...';
+        }
+    }
+}
+
+function syncFromRemote(data) {
+    console.log('[Timer] Syncing from remote data:', data);
+    state.type = data.type;
+    state.countdownMode = data.countdownMode || 'duration';
+    state.timerActive = state.isStandalone ? true : data.active;
+    state.pauseTime = data.pauseTime;
+    state.actualStartTime = data.actualStartTime;
+
+    // If standalone and timer should be active but startTime is null (host was paused)
+    // We set startTime to NOW to start it from the pauseTime.
+    if (state.isStandalone && state.timerActive && !data.startTime) {
+        state.startTime = Date.now();
+    } else {
+        state.startTime = data.startTime;
+    }
+
+    state.duration = data.duration;
+    state.timerName = data.timerName || '';
+
+    typeLabel.textContent = state.type === 'countdown' ? '타이머' : '스톱워치';
+    timerNameDisplay.textContent = state.timerName;
+
+    if (state.isStandalone) {
+        const typeName = state.type === 'countdown' ? '타이머' : '스톱워치';
+        shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
+    }
+
+    if (state.isCreator) {
         controls.classList.remove('hidden');
         viewerControls.classList.add('hidden');
-        syncStatus.textContent = '● 호스트 모드 (데이터 제어 가능)';
+        updateToggleButton();
+    } else if (state.isStandalone) {
+        controls.classList.add('hidden');
+        viewerControls.classList.add('hidden');
     } else {
         controls.classList.add('hidden');
         viewerControls.classList.remove('hidden');
-        syncStatus.textContent = '● 관전자 모드로 연결됨';
     }
-
-    if (db) {
-        const timerRef = ref(db, 'timers/' + id);
-        onValue(timerRef, (dataSnapshot) => {
-            const data = dataSnapshot.val();
-            if (data) {
-                // Precision Sync: Calculate local time vs server time drift if available
-                state.remoteState = data;
-                state.type = data.type || 'countdown';
-                state.timerActive = data.isRunning;
-                state.pauseTime = data.baseTime;
-                state.startTime = data.startTime; // Server timestamp
-                state.duration = data.duration || 600;
-                state.timerName = data.name || '';
-                state.actualStartTime = data.actualStartTime;
-
-                typeLabel.textContent = state.type === 'countdown' ? '타이머' : '스톱워치';
-                timerNameDisplay.textContent = state.timerName;
-                timerNameDisplay.classList.toggle('hidden', !state.timerName);
-
-                updateToggleButton();
-                titleUpdate();
-
-                // Update viewer UI
-                if (!state.isHost) {
-                    syncStatus.textContent = data.isRunning ? '● 실시간 동기화 중' : '● 일시정지됨 (관전자)';
-                    changeTargetBtn.classList.add('hidden');
-                } else {
-                    syncStatus.textContent = '● 실시간 동기화 중 (호스트)';
-                    changeTargetBtn.classList.toggle('hidden', state.type === 'countdown' && state.countdownMode === 'duration');
-                }
-            } else if (state.isHost) {
-                // Initialize room if host enters first time
-                resetTimer();
-            }
-        });
-    }
-
-    showTimer(id);
-}
-
-
-// Core Sync Logic
-async function toggleTimer() {
-    if (!state.isHost) return;
-
-    const newIsRunning = !state.timerActive;
-
-    // Calculate current seconds to save as the new base reference
-    const currentSeconds = calculateCurrentSeconds();
-
-    const updates = {
-        isRunning: newIsRunning,
-        baseTime: currentSeconds,
-        startTime: newIsRunning ? serverTimestamp() : null,
-        type: state.type,
-        duration: state.duration,
-        name: state.timerName || '',
-        actualStartTime: state.actualStartTime || null
-    };
-
-    if (db) {
-        await update(ref(db, 'timers/' + state.roomId), updates);
-    }
-}
-
-async function resetTimer() {
-    if (!state.isHost) return;
-
-    const updates = {
-        isRunning: false,
-        baseTime: state.type === 'countdown' ? state.duration : 0,
-        startTime: null,
-        actualStartTime: null
-    };
-
-    if (db) {
-        await update(ref(db, 'timers/' + state.roomId), updates);
-    }
-}
-
-async function applyNewTarget() {
-    if (!state.isHost) return;
-
-    const dateVal = newTargetDate.value;
-    let hourVal = parseInt(newTargetHour.value) || 12;
-    const minuteVal = newTargetMinute.value || '00';
-    const secondVal = newTargetSecond.value || '00';
-    const ampm = newTargetAmpm.value;
-
-    if (ampm === 'PM' && hourVal < 12) hourVal += 12;
-    if (ampm === 'AM' && hourVal === 12) hourVal = 0;
-
-    const targetDate = new Date(`${dateVal}T${hourVal.toString().padStart(2, '0')}:${minuteVal.padStart(2, '0')}:${secondVal.padStart(2, '0')}`);
-    const now = Date.now();
-    const newDuration = Math.max(0, (targetDate.getTime() - now) / 1000);
-
-    const updates = {
-        isRunning: true,
-        baseTime: newDuration,
-        startTime: serverTimestamp(),
-        duration: newDuration,
-        actualStartTime: targetDate.getTime()
-    };
-
-    if (db) {
-        await update(ref(db, 'timers/' + state.roomId), updates);
-        changeTargetModal.classList.add('hidden');
-    }
-}
-
-function calculateCurrentSeconds() {
-    // Current display time based on reference baseTime and last active startTime
-    if (!state.startTime || !state.timerActive) return state.pauseTime;
-
-    const now = Date.now();
-    const elapsed = (now - state.startTime) / 1000;
-
-    return state.type === 'countdown'
-        ? Math.max(0, state.pauseTime - elapsed)
-        : state.pauseTime + elapsed;
 }
 
 function updateToggleButton() {
@@ -660,16 +662,19 @@ function updateToggleButton() {
     changeTargetBtn.classList.add('hidden');
 
     if (state.type === 'countdown' && state.countdownMode === 'target') {
-        changeTargetBtn.classList.toggle('hidden', !state.isHost);
+        // Target Timer mode: show Change Target, hide others
+        changeTargetBtn.classList.remove('hidden');
         resetBtn.classList.add('hidden');
         toggleBtn.classList.add('hidden');
     } else if (isWaiting) {
+        // Scheduled stopwatch waiting: hide toggle, make reset full width
         toggleBtn.classList.add('hidden');
         resetBtn.classList.add('full-width');
     } else if (state.timerActive) {
         toggleBtn.textContent = '일시정지';
         toggleBtn.style.background = '#e53e3e';
     } else {
+        // Check if timer has been started before
         const hasStarted = state.type === 'countdown'
             ? state.pauseTime < state.duration
             : (state.pauseTime > 0 || state.actualStartTime !== null);
@@ -677,6 +682,7 @@ function updateToggleButton() {
         toggleBtn.textContent = hasStarted ? '재개' : '시작';
         toggleBtn.style.background = 'var(--primary-teal)';
 
+        // If countdown finished
         if (state.type === 'countdown' && state.pauseTime <= 0 && hasStarted) {
             toggleBtn.classList.add('hidden');
             resetBtn.classList.add('full-width');
@@ -684,28 +690,119 @@ function updateToggleButton() {
     }
 }
 
-async function stopTimerAtZero() {
-    if (state.isHost) {
-        const updates = {
-            isRunning: false,
-            baseTime: 0,
-            startTime: null
-        };
-        if (db) await update(ref(db, 'timers/' + state.roomId), updates);
+async function applyNewTarget() {
+    if (!state.isCreator) return;
+
+    const dateVal = newTargetDate.value;
+    let hourVal = parseInt(newTargetHour.value) || 12;
+    const minuteVal = newTargetMinute.value || '00';
+    const secondVal = newTargetSecond.value || '00';
+    const ampm = newTargetAmpm.value;
+
+    if (ampm === 'PM' && hourVal < 12) hourVal += 12;
+    if (ampm === 'AM' && hourVal === 12) hourVal = 0;
+
+    const targetDate = new Date(`${dateVal}T${hourVal.toString().padStart(2, '0')}:${minuteVal.padStart(2, '0')}:${secondVal.padStart(2, '0')}`);
+    const targetTime = targetDate.getTime();
+    const now = Date.now();
+
+    const newPauseTime = Math.max(0, (targetTime - now) / 1000);
+
+    const updates = {
+        pauseTime: newPauseTime,
+        startTime: now,
+        active: true
+    };
+
+    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
+        await update(ref(db, 'timers/' + state.roomId), updates);
+    } else {
+        Object.assign(state, updates);
+        state.timerActive = true;
+        updateToggleButton();
+        broadcastSync();
     }
 
-    // Local side effects for ALL (Host & Guests)
-    if (state.timerActive) {
-        state.timerActive = false;
-        state.pauseTime = 0;
-        state.startTime = null;
+    changeTargetModal.classList.add('hidden');
+}
+
+async function toggleTimer() {
+    if (!state.isCreator) return;
+
+    const now = Date.now();
+    const newActive = !state.timerActive;
+    let newPauseTime = state.pauseTime;
+
+    if (!newActive) {
+        // Pausing: calculate new pauseTime
+        const elapsed = (now - (state.startTime || now)) / 1000;
+        if (state.type === 'countdown') {
+            newPauseTime -= elapsed;
+        } else {
+            newPauseTime += elapsed;
+        }
+    }
+
+    const updates = {
+        active: newActive,
+        startTime: newActive ? now : null,
+        pauseTime: newPauseTime
+    };
+
+    if (newActive && state.type === 'stopwatch' && !state.actualStartTime) {
+        updates.actualStartTime = now;
+        state.actualStartTime = now;
+    }
+
+    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
+        await update(ref(db, 'timers/' + state.roomId), updates);
+    } else {
+        // Update local state for offline demo
+        Object.assign(state, updates);
+        state.timerActive = newActive;
         updateToggleButton();
-        playAlarmSound();
-        showTimerNotification();
+        // Notify other tabs
+        broadcastSync();
+    }
+}
+
+async function resetTimer() {
+    if (!state.isCreator) return;
+
+    const updates = {
+        active: false,
+        startTime: null,
+        actualStartTime: null,
+        pauseTime: state.type === 'countdown' ? state.duration : 0
+    };
+
+    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
+        await update(ref(db, 'timers/' + state.roomId), updates);
+    } else {
+        Object.assign(state, updates);
+        state.timerActive = false;
+        toggleBtn.classList.remove('hidden'); // Show toggle button again
+        resetBtn.classList.remove('full-width'); // Remove full width from reset button
+        updateToggleButton();
+        // Notify other tabs
+        broadcastSync();
     }
 }
 
 function copyLink(standalone) {
+    if (!standalone) {
+        const strong = shareOnlineBtn.querySelector('strong');
+        const originalText = strong.textContent;
+        strong.textContent = '개발 중입니다!';
+        shareOnlineBtn.style.opacity = '0.7';
+
+        setTimeout(() => {
+            strong.textContent = originalText;
+            shareOnlineBtn.style.opacity = '1';
+        }, 1500);
+        return;
+    }
+
     const baseUrl = `${window.location.origin}${window.location.pathname}`;
     let url = `${baseUrl}#/${state.roomId}`;
 
@@ -714,7 +811,7 @@ function copyLink(standalone) {
     }
 
     navigator.clipboard.writeText(url).then(() => {
-        const btn = standalone ? shareStandaloneBtn : shareOnlineBtn;
+        const btn = shareStandaloneBtn;
         const originalText = btn.innerHTML;
         btn.innerHTML = '<strong>복사되었습니다!</strong>';
         setTimeout(() => {
@@ -751,22 +848,27 @@ function startTicker() {
 }
 
 function updateDisplay() {
-    let displaySeconds = calculateCurrentSeconds();
+    let displaySeconds = state.pauseTime;
     let isWaiting = false;
 
     if (state.timerActive && state.startTime) {
-        // Special case for countdown end
-        if (state.type === 'countdown' && displaySeconds <= 0) {
-            displaySeconds = 0;
-            stopTimerAtZero();
-        }
+        const now = Date.now();
+        const elapsed = (now - state.startTime) / 1000;
 
-        // Special case for stopwatch future start
-        if (state.type === 'stopwatch' && state.actualStartTime) {
-            const now = Date.now();
-            if (now < state.actualStartTime) {
+        if (state.type === 'countdown') {
+            displaySeconds = state.pauseTime - elapsed;
+            if (displaySeconds <= 0) {
+                displaySeconds = 0;
+                if (state.isCreator) {
+                    stopTimerAtZero();
+                }
+            }
+        } else {
+            if (elapsed < 0) {
                 displaySeconds = 0;
                 isWaiting = true;
+            } else {
+                displaySeconds = Math.max(0, state.pauseTime + elapsed);
             }
         }
     }
@@ -817,7 +919,7 @@ function updateDisplay() {
     }
 
     // Check if we need to update buttons (e.g. waiting finished)
-    if (state.isHost && (state.lastIsWaiting !== isWaiting)) {
+    if (state.isCreator && (state.lastIsWaiting !== isWaiting)) {
         state.lastIsWaiting = isWaiting;
         updateToggleButton();
     }
@@ -844,6 +946,21 @@ function updateDisplay() {
     } else {
         timerDisplay.innerHTML = formatted;
     }
+}
+
+function stopTimerAtZero() {
+    state.timerActive = false;
+    state.pauseTime = 0;
+    state.startTime = null;
+    updateToggleButton();
+
+    // Play alarm sound
+    playAlarmSound();
+
+    // Show browser notification
+    showTimerNotification();
+
+    broadcastSync();
 }
 
 function playAlarmSound() {
@@ -917,6 +1034,38 @@ function showTimerNotification() {
     }
 }
 
+function broadcastSync() {
+    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
+        update(ref(db, 'timers/' + state.roomId), {
+            type: state.type,
+            active: state.timerActive,
+            pauseTime: state.pauseTime,
+            startTime: state.startTime,
+            actualStartTime: state.actualStartTime,
+            duration: state.duration,
+            timerName: state.timerName
+        });
+    } else {
+        // Save state to localStorage for persistence regardless of role
+        if (state.roomId) {
+            // Only save if we have valid data (e.g. Creator). Values might be null if we are just a viewer who hasn't synced yet.
+            // But broadcastSync is usually called by creator or after sync.
+            // Check if we are creator or standalone-master to avoid overwriting with empty state? 
+            // Actually broadcastSync is called when WE change something.
+            localStorage.setItem(`timer_state_${state.roomId}`, JSON.stringify(getSerializableState()));
+        }
+
+        if (!state.bc) {
+            state.bc = new BroadcastChannel('timer_' + state.roomId);
+        }
+        console.log('[Timer] Broadcasting state via BC:', getSerializableState());
+        try {
+            state.bc.postMessage({ msgType: 'SYNC', state: getSerializableState() });
+        } catch (e) {
+            console.error('[Timer] Failed to post SYNC message:', e);
+        }
+    }
+}
 
 // Timer List Management Functions
 function loadTimerList() {
