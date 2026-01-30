@@ -133,6 +133,9 @@ const shareSubtitle = document.getElementById('share-subtitle');
 const shareStandaloneLabel = document.getElementById('share-standalone-label');
 const ogPreviewContainer = document.getElementById('og-preview-container');
 const ogPreviewImg = document.getElementById('og-preview-img');
+const ogLoading = document.getElementById('og-loading');
+
+const IMGUR_CLIENT_ID = '39f864448530ec5'; // Placeholder for Imgur Client ID
 
 // Change Target Modal Elements
 const changeTargetBtn = document.getElementById('change-target-btn');
@@ -1484,6 +1487,34 @@ function updateThemeUI() {
     }
 }
 
+// Imgur Upload Helper
+async function uploadToImgur(canvas) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+            const formData = new FormData();
+            formData.append('image', blob);
+
+            try {
+                const response = await fetch('https://api.imgur.com/3/image', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Client-ID ${IMGUR_CLIENT_ID}`
+                    },
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    resolve(result.data.link);
+                } else {
+                    reject(result.data.error || 'Upload failed');
+                }
+            } catch (err) {
+                reject(err);
+            }
+        }, 'image/png');
+    });
+}
+
 // Open Graph Image Generation
 async function updateOGMetadata() {
     if (state.view !== 'timer') return;
@@ -1550,14 +1581,22 @@ async function updateOGMetadata() {
 
     // Update Meta Tags
     try {
-        const dataUrl = canvas.toDataURL('image/png');
+        if (ogPreviewContainer) ogPreviewContainer.classList.remove('hidden');
+        if (ogLoading) ogLoading.classList.remove('hidden');
+        if (ogPreviewImg) {
+            ogPreviewImg.classList.add('loading');
+            ogPreviewImg.src = canvas.toDataURL('image/png'); // Show local preview first
+        }
 
-        // Update og:image
+        const imgurUrl = await uploadToImgur(canvas);
+        console.log('[OG] Image uploaded to Imgur:', imgurUrl);
+
+        // Update og:image with external URL
         let ogImage = document.querySelector('meta[property="og:image"]');
-        if (ogImage) ogImage.setAttribute('content', dataUrl);
+        if (ogImage) ogImage.setAttribute('content', imgurUrl);
 
         let twitterImage = document.querySelector('meta[name="twitter:image"]');
-        if (twitterImage) twitterImage.setAttribute('content', dataUrl);
+        if (twitterImage) twitterImage.setAttribute('content', imgurUrl);
 
         // Update URLs
         let ogUrl = document.querySelector('meta[property="og:url"]');
@@ -1574,13 +1613,18 @@ async function updateOGMetadata() {
         let twitterTitle = document.querySelector('meta[name="twitter:title"]');
         if (twitterTitle) twitterTitle.setAttribute('content', titleText);
 
-        // Update Preview Image in UI
-        if (ogPreviewImg) ogPreviewImg.src = dataUrl;
-        if (ogPreviewContainer) ogPreviewContainer.classList.remove('hidden');
+        // Update Preview Image in UI with actual external URL to verify
+        if (ogPreviewImg) {
+            ogPreviewImg.src = imgurUrl;
+            ogPreviewImg.classList.remove('loading');
+        }
+        if (ogLoading) ogLoading.classList.add('hidden');
 
-        console.log('[OG] Metadata updated with current state');
+        console.log('[OG] Metadata updated with Imgur URL');
     } catch (e) {
-        console.error('[OG] Failed to generate image:', e);
+        console.error('[OG] Failed to upload/update metadata:', e);
+        if (ogLoading) ogLoading.classList.add('hidden');
+        if (ogPreviewImg) ogPreviewImg.classList.remove('loading');
     }
 }
 
