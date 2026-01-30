@@ -131,6 +131,8 @@ const shareOnlineBtn = document.getElementById('share-online-btn');
 const shareStandaloneBtn = document.getElementById('share-standalone-btn');
 const shareSubtitle = document.getElementById('share-subtitle');
 const shareStandaloneLabel = document.getElementById('share-standalone-label');
+const ogPreviewContainer = document.getElementById('og-preview-container');
+const ogPreviewImg = document.getElementById('og-preview-img');
 
 // Change Target Modal Elements
 const changeTargetBtn = document.getElementById('change-target-btn');
@@ -1482,5 +1484,123 @@ function updateThemeUI() {
     }
 }
 
+// Open Graph Image Generation
+async function updateOGMetadata() {
+    if (state.view !== 'timer') return;
+
+    // Ensure fonts are loaded before drawing to canvas
+    if (document.fonts) {
+        await document.fonts.ready;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 630;
+    const ctx = canvas.getContext('2d');
+
+    const isDark = document.body.classList.contains('dark-mode');
+    const bgColor = isDark ? '#1a202c' : '#ffffff';
+    const textColor = isDark ? '#f7fafc' : '#1a202c';
+    const accentColor = '#319795'; // primary-teal
+
+    // Background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Gradient Overlay
+    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    grad.addColorStop(0, accentColor + (isDark ? '22' : '11'));
+    grad.addColorStop(1, bgColor);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Top Brand
+    ctx.fillStyle = accentColor;
+    ctx.font = 'bold 32px Inter, system-ui, sans-serif';
+    ctx.fillText('Online Timer', 60, 80);
+
+    // Timer Name
+    ctx.fillStyle = textColor;
+    ctx.font = '500 48px Inter, system-ui, sans-serif';
+    const name = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
+    ctx.fillText(name, 60, 160);
+
+    // Timer Type
+    ctx.fillStyle = isDark ? '#a0aec0' : '#718096';
+    ctx.font = '400 24px Inter, system-ui, sans-serif';
+    ctx.fillText(state.type === 'countdown' ? 'COUNTDOWN' : 'STOPWATCH', 60, 205);
+
+    // Big Time Display - Clean version for OG (no MS for stopwatch)
+    const displayClone = timerDisplay.cloneNode(true);
+    const msSpan = displayClone.querySelector('.timer-ms');
+    if (msSpan) msSpan.remove();
+    const timeText = displayClone.textContent;
+
+    ctx.fillStyle = textColor;
+    ctx.font = 'bold 180px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(timeText, canvas.width / 2, canvas.height / 2 + 50);
+
+    // Footer
+    ctx.textAlign = 'right';
+    ctx.fillStyle = isDark ? '#718096' : '#a0aec0';
+    ctx.font = '400 24px Inter, system-ui, sans-serif';
+    ctx.fillText('timeronline.me', canvas.width - 60, canvas.height - 60);
+
+    // Update Meta Tags
+    try {
+        const dataUrl = canvas.toDataURL('image/png');
+
+        // Update og:image
+        let ogImage = document.querySelector('meta[property="og:image"]');
+        if (ogImage) ogImage.setAttribute('content', dataUrl);
+
+        let twitterImage = document.querySelector('meta[name="twitter:image"]');
+        if (twitterImage) twitterImage.setAttribute('content', dataUrl);
+
+        // Update URLs
+        let ogUrl = document.querySelector('meta[property="og:url"]');
+        if (ogUrl) ogUrl.setAttribute('content', window.location.href);
+
+        let twitterUrl = document.querySelector('meta[name="twitter:url"]');
+        if (twitterUrl) twitterUrl.setAttribute('content', window.location.href);
+
+        // Also update og:title to include the time
+        let ogTitle = document.querySelector('meta[property="og:title"]');
+        const titleText = `${timeText} - ${name} | Online Timer`;
+        if (ogTitle) ogTitle.setAttribute('content', titleText);
+
+        let twitterTitle = document.querySelector('meta[name="twitter:title"]');
+        if (twitterTitle) twitterTitle.setAttribute('content', titleText);
+
+        // Update Preview Image in UI
+        if (ogPreviewImg) ogPreviewImg.src = dataUrl;
+        if (ogPreviewContainer) ogPreviewContainer.classList.remove('hidden');
+
+        console.log('[OG] Metadata updated with current state');
+    } catch (e) {
+        console.error('[OG] Failed to generate image:', e);
+    }
+}
+
+// Hook into state changes that should trigger OG update
+// We'll throttled update or just update when sharing/loading
+const originalJoinRoom = joinRoom;
+joinRoom = async function (...args) {
+    const res = await originalJoinRoom.apply(this, args);
+    // Wait a bit for the first tick to update the display
+    setTimeout(updateOGMetadata, 100);
+    return res;
+};
+
+const originalShareBtnClick = shareBtn.onclick; // Wait, shareBtn uses addEventListener
+// I'll add a new listener instead or wrap the existing ones.
+
+shareBtn.addEventListener('click', () => {
+    updateOGMetadata();
+});
+
 console.log('=== OnlineTimer App Script Loaded ===');
 init();
+

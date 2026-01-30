@@ -9,6 +9,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://timeronline.me/">
+    <meta property="og:title" content="실시간 공유 웹 타이머 | TimerOnline">
+    <meta property="og:description" content="실시간으로 공유하고 동기화되는 웹 타이머/스톱워치입니다.">
+    <meta property="og:image" content="/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://timeronline.me/">
+    <meta property="twitter:title" content="실시간 공유 웹 타이머 | TimerOnline">
+    <meta property="twitter:description" content="실시간으로 공유하고 동기화되는 웹 타이머/스톱워치입니다.">
+    <meta property="twitter:image" content="/og-image.png">
 </head>
 
 <body>
@@ -176,6 +190,11 @@
             <div class="modal-content card">
                 <h3>링크 공유하기</h3>
                 <p id="share-subtitle">원하는 공유 방식을 선택하세요.</p>
+
+                <div id="og-preview-container" class="og-preview-container hidden">
+                    <label>미리보기</label>
+                    <img id="og-preview-img" src="" alt="OG Preview">
+                </div>
 
                 <div class="share-options">
                     <button id="share-online-btn" class="share-option-card">

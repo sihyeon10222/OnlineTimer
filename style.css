@@ -711,3 +711,30 @@ select:focus {
     height: 18px;
     pointer-events: none;
 }
+
+/* OG Preview Styling */
+.og-preview-container {
+    margin: 16px 0 24px 0;
+    text-align: left;
+    width: 100%;
+}
+
+.og-preview-container label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#og-preview-img {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    display: block;
+    background: var(--bg-gray);
+    aspect-ratio: 1200 / 630;
+    object-fit: cover;
+}
