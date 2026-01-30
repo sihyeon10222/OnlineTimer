@@ -30,16 +30,6 @@ try {
     console.warn("Firebase initialization failed. Using local mode.", e);
 }
 
-// Initialize GunDB for global sync without API keys (By any means necessary)
-// Using multiple reliable public relays for cross-device sync
-const gun = Gun([
-    'https://gun-manhattan.herokuapp.com/gun',
-    'https://relay.peer.ooo/gun',
-    'https://gun-relay.herokuapp.com/gun',
-    'https://peer.waller.top/gun'
-]);
-const GUN_NAMESPACE = 'timer_online_prod_v1';
-
 // Generate or retrieve a unique ID for this specific tab instance
 // window.name persists across reloads but is not usually copied to new tabs like sessionStorage is.
 if (!window.name || !window.name.startsWith('OnlineTimer_')) {
@@ -521,27 +511,17 @@ function joinRoom(id, params = new URLSearchParams()) {
     state.roomId = id;
     state.isStandalone = params.get('standalone') === 'true';
 
-    // Apply data-rich parameters if present (for standalone/offline support)
-    if (params.has('type')) state.type = params.get('type');
-    if (params.has('active')) state.timerActive = params.get('active') === 'true';
-    if (params.has('pause')) state.pauseTime = parseFloat(params.get('pause'));
-    if (params.has('start')) state.startTime = parseInt(params.get('start'));
-    if (params.has('dur')) state.duration = parseInt(params.get('dur'));
-    if (params.has('name')) state.timerName = params.get('name');
-    if (params.has('act')) state.actualStartTime = parseInt(params.get('act'));
-
     // Ownership check via sessionStorage (scoped to this room/tab)
     const ownerToken = sessionStorage.getItem(`timer_owner_${id}`);
     state.isCreator = ownerToken === tabId;
 
     showTimer(id);
-    updateToggleButton();
 
     if (state.isStandalone) {
-        viewerControls.classList.add('hidden');
+        viewerControls.classList.add('hidden'); // Hide viewer message in standalone
         syncStatus.title = "Standalone Mode (Not synced)";
-        shareOnlineBtn.classList.add('hidden');
-        shareSubtitle.classList.add('hidden');
+        shareOnlineBtn.classList.add('hidden'); // Hide sync link option in standalone mode
+        shareSubtitle.classList.add('hidden'); // Hide subtitle when only one option exists
     } else {
         shareOnlineBtn.classList.remove('hidden');
         shareSubtitle.classList.remove('hidden');
@@ -549,60 +529,84 @@ function joinRoom(id, params = new URLSearchParams()) {
         shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
     }
 
-    // --- 1. Firebase Sync (If configured by user) ---
     if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
         const timerRef = ref(db, 'timers/' + id);
-        onValue(timerRef, (snapshot) => {
+        const unsubscribe = onValue(timerRef, (snapshot) => {
             const data = snapshot.val();
-            if (data && !state.isCreator) {
+            if (data) {
                 state.remoteState = data;
                 syncFromRemote(data);
                 syncStatus.classList.add('online');
-                document.getElementById('sync-text').textContent = '동기화됨';
+
+                if (state.isStandalone) {
+                    // One-time sync for standalone
+                    unsubscribe();
+                    syncStatus.classList.remove('online');
+                    syncStatus.title = "Standalone Mode (Not synced)";
+                }
+            } else {
+                if (!state.isCreator) {
+                    alert('존재하지 않는 타이머입니다.');
+                    window.location.hash = '';
+                }
             }
         });
-    }
+    } else {
+        // Local mode fallback via BroadcastChannel
+        console.log(`[Timer] Joining room ${id} in local mode (standalone: ${state.isStandalone})`);
 
-    // --- 2. GunDB Sync (Global Cross-Device Relay - Used as Primary for Keyless Sync) ---
-    if (!state.isStandalone) {
-        console.log(`[Timer] Joining GunDB relay for room: ${id}`);
-        gun.get(GUN_NAMESPACE).get(id).on((data) => {
-            if (data && !state.isCreator && data.tabId !== tabId) {
-                // Filter out internal Gun metadata
-                const { _, ...cleanData } = data;
-                console.log('[Timer] Received state from GunDB relay');
-                syncFromRemote(cleanData);
-                syncStatus.classList.add('online');
-                document.getElementById('sync-text').textContent = '동기화됨';
-            }
-        });
-    }
-
-    // --- 3. Local/Tab-based Sync (BroadcastChannel + LocalStorage) ---
-    if (!db || firebaseConfig.apiKey === "DEMO_KEY") {
         if (state.bc) state.bc.close();
         state.bc = new BroadcastChannel('timer_' + id);
 
         state.bc.onmessage = (event) => {
+            console.log('[Timer] Received BC message:', event.data.msgType);
             if (event.data.msgType === 'SYNC') {
                 syncFromRemote(event.data.state);
                 syncStatus.classList.add('online');
-                document.getElementById('sync-text').textContent = '동기화됨';
+                document.getElementById('sync-text').textContent = state.isStandalone ? '개별 모드' : '동기화됨';
+
+                if (state.isStandalone) {
+                    console.log('[Timer] Standalone sync complete, closing channel.');
+                    state.bc.close();
+                    state.bc = null;
+                    syncStatus.classList.remove('online');
+                }
             } else if (event.data.msgType === 'REQUEST_STATE' && state.isCreator) {
+                console.log('[Timer] Host received REQUEST_STATE, broadcasting...');
                 broadcastSync();
             }
         };
 
         const savedState = localStorage.getItem(`timer_state_${id}`);
         if (savedState) {
-            syncFromRemote(JSON.parse(savedState));
+            console.log('[Timer] Found saved state in localStorage');
+            const data = JSON.parse(savedState);
+            syncFromRemote(data);
             syncStatus.classList.add('online');
+            document.getElementById('sync-text').textContent = state.isStandalone ? '개별 모드' : '동기화됨';
+            // Even if we have saved state, standalone might want to hear the LATEST from host at least once
+            // So we don't close the channel immediately here. It will be closed after the first sync.
         }
 
-        if (!state.isCreator && !savedState && !state.isStandalone) {
+        if (!state.isCreator) {
+            console.log('[Timer] Requesting state from host...');
+            try {
+                state.bc.postMessage({ msgType: 'REQUEST_STATE' });
+                // Backup request after 1.5 seconds if still nothing
+                setTimeout(() => {
+                    if (document.getElementById('sync-text').textContent.includes('대기')) {
+                        console.log('[Timer] Still waiting for sync, retrying request...');
+                        state.bc.postMessage({ msgType: 'REQUEST_STATE' });
+                    }
+                }, 1500);
+            } catch (e) {
+                console.error('[Timer] Failed to send REQUEST_STATE:', e);
+            }
+        }
+
+        if (!savedState && !state.isStandalone) {
             syncStatus.classList.remove('online');
             document.getElementById('sync-text').textContent = '동기화 대기 중...';
-            state.bc.postMessage({ msgType: 'REQUEST_STATE' });
         }
     }
 }
@@ -786,52 +790,14 @@ async function resetTimer() {
 }
 
 function copyLink(standalone) {
-    if (!standalone && firebaseConfig.apiKey === "DEMO_KEY") {
-        alert('현재 데모 모드입니다. 실시간 동기화 링크를 다른 기기에서 확인하려면 Firebase 설정이 필요합니다. 개별 모드 링크를 사용하시거나 기술 문서를 참고해주세요.');
-    }
+    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+    let url = `${baseUrl}#/${state.roomId}`;
 
-    // Robustly get base URL without hash
-    const baseUrl = window.location.href.split('#')[0].replace(/\/$/, '');
-    let url = `${baseUrl}/#/${state.roomId}`;
-
-    const params = new URLSearchParams();
     if (standalone) {
-        params.set('standalone', 'true');
-        params.set('type', state.type);
-        params.set('active', state.timerActive);
-        params.set('pause', Math.round(state.pauseTime));
-        params.set('start', state.startTime || 0);
-        params.set('dur', state.duration);
-        params.set('name', state.timerName || '');
-        if (state.actualStartTime) params.set('act', state.actualStartTime);
+        url += `?standalone=true`;
     }
 
-    const paramStr = params.toString();
-    if (paramStr) {
-        url += `?${paramStr}`;
-    }
-
-    const performCopy = (text) => {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            return navigator.clipboard.writeText(text);
-        } else {
-            // Fallback for older browsers or insecure contexts
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-999999px";
-            textArea.style.top = "-999999px";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            return new Promise((res, rej) => {
-                document.execCommand('copy') ? res() : rej();
-                textArea.remove();
-            });
-        }
-    };
-
-    performCopy(url).then(() => {
+    navigator.clipboard.writeText(url).then(() => {
         const btn = standalone ? shareStandaloneBtn : shareOnlineBtn;
         const originalText = btn.innerHTML;
         btn.innerHTML = '<strong>복사되었습니다!</strong>';
@@ -839,9 +805,6 @@ function copyLink(standalone) {
             btn.innerHTML = originalText;
             shareModal.classList.add('hidden');
         }, 1500);
-    }).catch(err => {
-        console.error('Failed to copy link:', err);
-        alert('링크 복사에 실패했습니다. 수동으로 복사해주세요: ' + url);
     });
 }
 
@@ -1059,37 +1022,30 @@ function showTimerNotification() {
 }
 
 function broadcastSync() {
-    const syncData = {
-        type: state.type,
-        active: state.timerActive,
-        pauseTime: state.pauseTime,
-        startTime: state.startTime,
-        actualStartTime: state.actualStartTime,
-        duration: state.duration,
-        timerName: state.timerName,
-        tabId: tabId // To identify sender
-    };
-
     if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        update(ref(db, 'timers/' + state.roomId), syncData);
-    }
+        update(ref(db, 'timers/' + state.roomId), {
+            type: state.type,
+            active: state.timerActive,
+            pauseTime: state.pauseTime,
+            startTime: state.startTime,
+            actualStartTime: state.actualStartTime,
+            duration: state.duration,
+            timerName: state.timerName
+        });
+    } else {
+        // Save state to localStorage for persistence regardless of role
+        if (state.roomId) {
+            // Only save if we have valid data (e.g. Creator). Values might be null if we are just a viewer who hasn't synced yet.
+            // But broadcastSync is usually called by creator or after sync.
+            // Check if we are creator or standalone-master to avoid overwriting with empty state? 
+            // Actually broadcastSync is called when WE change something.
+            localStorage.setItem(`timer_state_${state.roomId}`, JSON.stringify(getSerializableState()));
+        }
 
-    // ALWAYS broadcast to GunDB if we are the creator for global cross-device support
-    if (state.roomId && state.isCreator) {
-        console.log('[Timer] Pushing state to GunDB relay...');
-        gun.get(GUN_NAMESPACE).get(state.roomId).put(syncData);
-    }
-
-    // Save state to localStorage for persistence
-    if (state.roomId && (state.isCreator || state.isStandalone)) {
-        localStorage.setItem(`timer_state_${state.roomId}`, JSON.stringify(getSerializableState()));
-    }
-
-    // Broadcast to other tabs on the same machine
-    if (state.roomId) {
         if (!state.bc) {
             state.bc = new BroadcastChannel('timer_' + state.roomId);
         }
+        console.log('[Timer] Broadcasting state via BC:', getSerializableState());
         try {
             state.bc.postMessage({ msgType: 'SYNC', state: getSerializableState() });
         } catch (e) {
