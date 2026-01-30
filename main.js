@@ -1514,7 +1514,7 @@ function getOGImageUrl() {
     // Use the production URL for the API
     const baseApiUrl = window.location.hostname === 'localhost'
         ? `${window.location.origin}/api/og`
-        : 'https://timeronline.vercel.app/api/og';
+        : 'https://timeronlineshare.vercel.app/api/og';
 
     return `${baseApiUrl}?v=${encodeURIComponent(compact)}`;
 }
