@@ -29,186 +29,97 @@ function parseTimerState(v) {
     const EPOCH = 1735689600000; // 2025-01-01
     const pauseTime = fromB64(parts[1]) / 1000 || 0;
 
-    let startTime = null;
-    if (parts[2]) {
-        startTime = fromB64(parts[2]) + EPOCH;
-    }
-
-    let actualStartTime = null;
-    if (parts.length >= 4 && parts[3]) {
-        actualStartTime = parts[3] === '-' ? startTime : fromB64(parts[3]) + EPOCH;
-    }
-
     const timerName = parts[5] ? decodeURIComponent(parts[5]) : '';
 
     return {
         type,
         isActive,
         pauseTime,
-        startTime,
-        actualStartTime,
         timerName
     };
 }
 
 function formatTime(totalSeconds) {
-    const d = Math.floor(totalSeconds / 86400);
-    const h = Math.floor((totalSeconds % 86400) / 3600);
+    const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
+    const s = Math.floor(totalSeconds % 60);
 
-    let timeStr = '';
-    if (d > 0) {
-        timeStr = `${d}일 `;
-    }
-    timeStr += [
+    return [
         h.toString().padStart(2, '0'),
         m.toString().padStart(2, '0'),
         s.toString().padStart(2, '0')
     ].join(':');
-
-    return timeStr;
 }
 
-export default function handler(request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const v = searchParams.get('v');
+export default async function handler(request) {
+    const { searchParams } = new URL(request.url);
+    const v = searchParams.get('v');
 
-        const state = parseTimerState(v) || {
-            type: 'countdown',
-            isActive: false,
-            pauseTime: 600,
-            timerName: '타이머'
-        };
+    const state = parseTimerState(v) || {
+        type: 'countdown',
+        isActive: false,
+        pauseTime: 600,
+        timerName: ''
+    };
 
-        // Calculate display time
-        let displaySeconds = state.pauseTime;
-        if (state.isActive && state.startTime) {
-            const now = Date.now();
-            const elapsed = (now - state.startTime) / 1000;
-            if (state.type === 'countdown') {
-                displaySeconds = Math.max(0, state.pauseTime - elapsed);
-            } else {
-                displaySeconds = Math.max(0, state.pauseTime + elapsed);
-            }
-        }
+    const timeStr = formatTime(state.pauseTime);
+    const timerName = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
+    const typeLabel = state.type === 'countdown' ? '타이머' : '스톱워치';
+    const statusLabel = state.isActive ? '진행 중' : '일시정지';
 
-        const timeStr = formatTime(Math.floor(displaySeconds));
-        const timerName = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
-        const typeLabel = state.type === 'countdown' ? '타이머' : '스톱워치';
-
-        let statusLabel = '';
-        if (state.isActive) {
-            statusLabel = '진행 중';
-        } else if (state.type === 'countdown' && state.pauseTime <= 0) {
-            statusLabel = '종료됨';
-        } else {
-            statusLabel = '일시정지';
-        }
-
-        // Using HTML string instead of JSX for better compatibility
-        const html = {
+    return new ImageResponse(
+        {
             type: 'div',
             props: {
-                style: {
-                    height: '100%',
-                    width: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'linear-gradient(135deg, #e6fffa 0%, #f0fff4 100%)',
-                    fontFamily: 'Inter, sans-serif',
-                },
+                tw: 'flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-teal-100 to-green-100',
                 children: [
-                    // Brand
                     {
                         type: 'div',
                         props: {
-                            style: {
-                                fontSize: 36,
-                                fontWeight: 700,
-                                color: '#008080',
-                                marginBottom: 20,
-                            },
+                            tw: 'text-4xl font-bold text-teal-600 mb-4',
                             children: 'Online Timer'
                         }
                     },
-                    // Timer Name
                     {
                         type: 'div',
                         props: {
-                            style: {
-                                fontSize: 42,
-                                fontWeight: 700,
-                                color: '#2d3748',
-                                marginBottom: 30,
-                            },
+                            tw: 'text-5xl font-bold text-gray-800 mb-8',
                             children: timerName.length > 20 ? timerName.substring(0, 20) + '...' : timerName
                         }
                     },
-                    // Time Display Box
                     {
                         type: 'div',
                         props: {
-                            style: {
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '30px 60px',
-                                background: 'rgba(255, 255, 255, 0.9)',
-                                borderRadius: 20,
-                                border: '3px solid #008080',
-                            },
+                            tw: 'flex items-center justify-center px-16 py-8 bg-white rounded-3xl border-4 border-teal-500',
                             children: {
                                 type: 'div',
                                 props: {
-                                    style: {
-                                        fontSize: 72,
-                                        fontWeight: 900,
-                                        color: '#008080',
-                                    },
+                                    tw: 'text-7xl font-black text-teal-600',
                                     children: timeStr
                                 }
                             }
                         }
                     },
-                    // Status
                     {
                         type: 'div',
                         props: {
-                            style: {
-                                fontSize: 32,
-                                color: '#718096',
-                                marginTop: 30,
-                            },
+                            tw: 'text-3xl text-gray-500 mt-8',
                             children: `${typeLabel} • ${statusLabel}`
                         }
                     },
-                    // Footer
                     {
                         type: 'div',
                         props: {
-                            style: {
-                                position: 'absolute',
-                                bottom: 30,
-                                fontSize: 20,
-                                color: '#cbd5e0',
-                            },
+                            tw: 'absolute bottom-8 text-xl text-gray-400',
                             children: 'timeronlineshare.vercel.app'
                         }
                     }
                 ]
             }
-        };
-
-        return new ImageResponse(html, {
+        },
+        {
             width: 1200,
             height: 630,
-        });
-    } catch (e) {
-        console.error('OG Image generation error:', e);
-        return new Response(`Failed to generate image: ${e.message}`, { status: 500 });
-    }
+        }
+    );
 }
