@@ -71,7 +71,8 @@ const state = {
     stopwatchMode: 'immediate',
     actualStartTime: null,
     timerName: '',
-    lastIsWaiting: false
+    lastIsWaiting: false,
+    lastImageUrl: null
 };
 
 // UI Elements
@@ -919,9 +920,24 @@ function copyLink(standalone) {
     // Payload: [flags],[pause],[start],[actual],[duration],[name]
     // Trim trailing empty commas
     const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
-    const url = `${baseUrl}#*${compact}`;
+    const finalAppUrl = `${baseUrl}#*${compact}`;
 
-    navigator.clipboard.writeText(url).then(() => {
+    let shareUrl = finalAppUrl;
+
+    // If we have an uploaded OG image, use the proxy for social crawlers
+    if (state.lastImageUrl) {
+        const proxyBase = `${window.location.origin}/api/og`;
+        const timeText = getCleanTimeText();
+        const params = new URLSearchParams();
+        params.append('title', state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치'));
+        params.append('time', timeText || timerDisplay.textContent.replace(/\s+/g, ''));
+        params.append('type', state.type);
+        params.append('img', state.lastImageUrl);
+        params.append('url', finalAppUrl);
+        shareUrl = `${proxyBase}?${params.toString()}`;
+    }
+
+    navigator.clipboard.writeText(shareUrl).then(() => {
         const btn = shareStandaloneBtn;
         const originalText = btn.innerHTML;
         btn.innerHTML = '<strong>복사되었습니다!</strong>';
@@ -1515,6 +1531,13 @@ async function uploadToImgur(canvas) {
     });
 }
 
+function getCleanTimeText() {
+    const displayClone = timerDisplay.cloneNode(true);
+    const msSpan = displayClone.querySelector('.timer-ms');
+    if (msSpan) msSpan.remove();
+    return displayClone.textContent.trim();
+}
+
 // Open Graph Image Generation
 async function updateOGMetadata() {
     if (state.view !== 'timer') return;
@@ -1562,10 +1585,7 @@ async function updateOGMetadata() {
     ctx.fillText(state.type === 'countdown' ? 'COUNTDOWN' : 'STOPWATCH', 60, 205);
 
     // Big Time Display - Clean version for OG (no MS for stopwatch)
-    const displayClone = timerDisplay.cloneNode(true);
-    const msSpan = displayClone.querySelector('.timer-ms');
-    if (msSpan) msSpan.remove();
-    const timeText = displayClone.textContent;
+    const timeText = getCleanTimeText();
 
     ctx.fillStyle = textColor;
     ctx.font = 'bold 180px Inter, system-ui, sans-serif';
@@ -1590,6 +1610,7 @@ async function updateOGMetadata() {
 
         const imgurUrl = await uploadToImgur(canvas);
         console.log('[OG] Image uploaded to Imgur:', imgurUrl);
+        state.lastImageUrl = imgurUrl;
 
         // Update og:image with external URL
         let ogImage = document.querySelector('meta[property="og:image"]');
