@@ -71,8 +71,7 @@ const state = {
     stopwatchMode: 'immediate',
     actualStartTime: null,
     timerName: '',
-    lastIsWaiting: false,
-    lastImageUrl: null
+    lastIsWaiting: false
 };
 
 // UI Elements
@@ -132,11 +131,6 @@ const shareOnlineBtn = document.getElementById('share-online-btn');
 const shareStandaloneBtn = document.getElementById('share-standalone-btn');
 const shareSubtitle = document.getElementById('share-subtitle');
 const shareStandaloneLabel = document.getElementById('share-standalone-label');
-const ogPreviewContainer = document.getElementById('og-preview-container');
-const ogPreviewImg = document.getElementById('og-preview-img');
-const ogLoading = document.getElementById('og-loading');
-
-const IMGUR_CLIENT_ID = '39f864448530ec5'; // Placeholder for Imgur Client ID
 
 // Change Target Modal Elements
 const changeTargetBtn = document.getElementById('change-target-btn');
@@ -204,8 +198,12 @@ function setupListeners() {
         const typeName = state.type === 'countdown' ? '타이머' : '스톱워치';
         shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
         shareModal.classList.remove('hidden');
+        handleShareWithOG();
     });
-    closeShareModal.addEventListener('click', () => shareModal.classList.add('hidden'));
+    closeShareModal.addEventListener('click', () => {
+        shareModal.classList.add('hidden');
+        resetOGPreview();
+    });
     shareOnlineBtn.addEventListener('click', () => copyLink(false));
     shareStandaloneBtn.addEventListener('click', () => copyLink(true));
 
@@ -920,24 +918,9 @@ function copyLink(standalone) {
     // Payload: [flags],[pause],[start],[actual],[duration],[name]
     // Trim trailing empty commas
     const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
-    const finalAppUrl = `${baseUrl}#*${compact}`;
+    const url = `${baseUrl}#*${compact}`;
 
-    let shareUrl = finalAppUrl;
-
-    // If we have an uploaded OG image, use the proxy for social crawlers
-    if (state.lastImageUrl) {
-        const proxyBase = `${window.location.origin}/api/og`;
-        const timeText = getCleanTimeText();
-        const params = new URLSearchParams();
-        params.append('title', state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치'));
-        params.append('time', timeText || timerDisplay.textContent.replace(/\s+/g, ''));
-        params.append('type', state.type);
-        params.append('img', state.lastImageUrl);
-        params.append('url', finalAppUrl);
-        shareUrl = `${proxyBase}?${params.toString()}`;
-    }
-
-    navigator.clipboard.writeText(shareUrl).then(() => {
+    navigator.clipboard.writeText(url).then(() => {
         const btn = shareStandaloneBtn;
         const originalText = btn.innerHTML;
         btn.innerHTML = '<strong>복사되었습니다!</strong>';
@@ -1503,169 +1486,241 @@ function updateThemeUI() {
     }
 }
 
-// Imgur Upload Helper
-async function uploadToImgur(canvas) {
-    return new Promise((resolve, reject) => {
-        canvas.toBlob(async (blob) => {
-            const formData = new FormData();
-            formData.append('image', blob);
+// OG Image Preview Elements
+const ogPreviewContainer = document.getElementById('og-preview-container');
+const ogLoading = document.getElementById('og-loading');
+const ogImageWrapper = document.getElementById('og-image-wrapper');
+const ogPreviewImage = document.getElementById('og-preview-image');
 
-            try {
-                const response = await fetch('https://api.imgur.com/3/image', {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Client-ID ${IMGUR_CLIENT_ID}`
-                    },
-                    body: formData
-                });
-                const result = await response.json();
-                if (result.success) {
-                    resolve(result.data.link);
-                } else {
-                    reject(result.data.error || 'Upload failed');
-                }
-            } catch (err) {
-                reject(err);
+// Imgur Client ID (Anonymous uploads)
+const IMGUR_CLIENT_ID = 'f9ae652a9a55e77';
+
+// Generate OG Image using Canvas
+function generateOGImage() {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1200;
+        canvas.height = 630;
+        const ctx = canvas.getContext('2d');
+
+        const isDark = document.body.classList.contains('dark-mode');
+
+        // Background gradient
+        const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+        if (isDark) {
+            gradient.addColorStop(0, '#1a202c');
+            gradient.addColorStop(1, '#2d3748');
+        } else {
+            gradient.addColorStop(0, '#e6fffa');
+            gradient.addColorStop(1, '#f0fff4');
+        }
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 1200, 630);
+
+        // Decorative circles
+        ctx.globalAlpha = 0.1;
+        ctx.fillStyle = '#008080';
+        ctx.beginPath();
+        ctx.arc(100, 100, 200, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(1100, 530, 250, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Brand name
+        ctx.fillStyle = '#008080';
+        ctx.font = 'bold 36px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Online Timer', 600, 80);
+
+        // Timer name
+        const timerName = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
+        ctx.fillStyle = isDark ? '#f7fafc' : '#2d3748';
+        ctx.font = 'bold 42px Inter, system-ui, sans-serif';
+        ctx.fillText(timerName.length > 20 ? timerName.substring(0, 20) + '...' : timerName, 600, 180);
+
+        // Calculate current time
+        let displaySeconds = state.pauseTime;
+        if (state.timerActive && state.startTime) {
+            const now = Date.now();
+            const elapsed = (now - state.startTime) / 1000;
+            if (state.type === 'countdown') {
+                displaySeconds = Math.max(0, state.pauseTime - elapsed);
+            } else {
+                displaySeconds = Math.max(0, state.pauseTime + elapsed);
             }
-        }, 'image/png');
+        }
+
+        const totalSeconds = Math.abs(Math.floor(displaySeconds));
+        const d = Math.floor(totalSeconds / 86400);
+        const h = Math.floor((totalSeconds % 86400) / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        let timeStr = '';
+        if (d > 0) {
+            timeStr = `${d}일 `;
+        }
+        timeStr += [
+            h.toString().padStart(2, '0'),
+            m.toString().padStart(2, '0'),
+            s.toString().padStart(2, '0')
+        ].join(':');
+
+        // Time display box
+        const boxWidth = 500;
+        const boxHeight = 150;
+        const boxX = (1200 - boxWidth) / 2;
+        const boxY = 230;
+
+        // Box background
+        ctx.fillStyle = isDark ? 'rgba(45, 55, 72, 0.8)' : 'rgba(255, 255, 255, 0.9)';
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 20);
+        ctx.fill();
+
+        // Box border
+        ctx.strokeStyle = '#008080';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Time text
+        ctx.fillStyle = '#008080';
+        ctx.font = 'bold 72px Inter, system-ui, sans-serif';
+        ctx.fillText(timeStr, 600, boxY + 100);
+
+        // Status info
+        const typeLabel = state.type === 'countdown' ? '타이머' : '스톱워치';
+        let statusLabel = '';
+        if (state.timerActive) {
+            statusLabel = '진행 중';
+        } else if (state.type === 'countdown' && state.pauseTime <= 0) {
+            statusLabel = '종료됨';
+        } else {
+            statusLabel = '일시정지';
+        }
+
+        ctx.fillStyle = isDark ? '#a0aec0' : '#718096';
+        ctx.font = '32px Inter, system-ui, sans-serif';
+        ctx.fillText(`${typeLabel} • ${statusLabel}`, 600, 450);
+
+        // Additional info (end/start time)
+        if (state.startTime) {
+            let infoText = '';
+            if (state.type === 'countdown' && state.timerActive) {
+                const endPoint = new Date(state.startTime + state.pauseTime * 1000);
+                infoText = `종료 예정: ${formatDateTime(endPoint)}`;
+            } else if (state.type === 'stopwatch' && state.actualStartTime) {
+                const startPoint = new Date(state.actualStartTime);
+                infoText = `시작 시간: ${formatDateTime(startPoint)}`;
+            }
+            if (infoText) {
+                ctx.fillStyle = isDark ? '#718096' : '#a0aec0';
+                ctx.font = '24px Inter, system-ui, sans-serif';
+                ctx.fillText(infoText, 600, 510);
+            }
+        }
+
+        // Footer
+        ctx.fillStyle = isDark ? '#4a5568' : '#cbd5e0';
+        ctx.font = '20px Inter, system-ui, sans-serif';
+        ctx.fillText('timeronline.vercel.app', 600, 590);
+
+        // Convert to base64
+        const base64 = canvas.toDataURL('image/png').split(',')[1];
+        resolve(base64);
     });
 }
 
-function getCleanTimeText() {
-    const displayClone = timerDisplay.cloneNode(true);
-    const msSpan = displayClone.querySelector('.timer-ms');
-    if (msSpan) msSpan.remove();
-    return displayClone.textContent.trim();
+function formatDateTime(date) {
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours();
+    const ampm = hours >= 12 ? '오후' : '오전';
+    const hour12 = hours % 12 || 12;
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${month}/${day} ${ampm} ${hour12}:${minutes}`;
 }
 
-// Open Graph Image Generation
-async function updateOGMetadata() {
-    if (state.view !== 'timer') return;
-
-    // Ensure fonts are loaded before drawing to canvas
-    if (document.fonts) {
-        await document.fonts.ready;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 630;
-    const ctx = canvas.getContext('2d');
-
-    const isDark = document.body.classList.contains('dark-mode');
-    const bgColor = isDark ? '#1a202c' : '#ffffff';
-    const textColor = isDark ? '#f7fafc' : '#1a202c';
-    const accentColor = '#319795'; // primary-teal
-
-    // Background
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Gradient Overlay
-    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    grad.addColorStop(0, accentColor + (isDark ? '22' : '11'));
-    grad.addColorStop(1, bgColor);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Top Brand
-    ctx.fillStyle = accentColor;
-    ctx.font = 'bold 32px Inter, system-ui, sans-serif';
-    ctx.fillText('Online Timer', 60, 80);
-
-    // Timer Name
-    ctx.fillStyle = textColor;
-    ctx.font = '500 48px Inter, system-ui, sans-serif';
-    const name = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
-    ctx.fillText(name, 60, 160);
-
-    // Timer Type
-    ctx.fillStyle = isDark ? '#a0aec0' : '#718096';
-    ctx.font = '400 24px Inter, system-ui, sans-serif';
-    ctx.fillText(state.type === 'countdown' ? 'COUNTDOWN' : 'STOPWATCH', 60, 205);
-
-    // Big Time Display - Clean version for OG (no MS for stopwatch)
-    const timeText = getCleanTimeText();
-
-    ctx.fillStyle = textColor;
-    ctx.font = 'bold 180px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(timeText, canvas.width / 2, canvas.height / 2 + 50);
-
-    // Footer
-    ctx.textAlign = 'right';
-    ctx.fillStyle = isDark ? '#718096' : '#a0aec0';
-    ctx.font = '400 24px Inter, system-ui, sans-serif';
-    ctx.fillText('timeronline.me', canvas.width - 60, canvas.height - 60);
-
-    // Update Meta Tags
+// Upload image to Imgur
+async function uploadToImgur(base64Data) {
     try {
-        if (ogPreviewContainer) ogPreviewContainer.classList.remove('hidden');
-        if (ogLoading) ogLoading.classList.remove('hidden');
-        if (ogPreviewImg) {
-            ogPreviewImg.classList.add('loading');
-            ogPreviewImg.src = canvas.toDataURL('image/png'); // Show local preview first
+        const response = await fetch('https://api.imgur.com/3/image', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                image: base64Data,
+                type: 'base64',
+                name: `og_${Date.now()}_${generateShortId(6)}.png`
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            return { success: true, url: data.data.link };
+        } else {
+            console.error('Imgur upload failed:', data);
+            return { success: false, error: data.data?.error || 'Upload failed' };
         }
-
-        const imgurUrl = await uploadToImgur(canvas);
-        console.log('[OG] Image uploaded to Imgur:', imgurUrl);
-        state.lastImageUrl = imgurUrl;
-
-        // Update og:image with external URL
-        let ogImage = document.querySelector('meta[property="og:image"]');
-        if (ogImage) ogImage.setAttribute('content', imgurUrl);
-
-        let twitterImage = document.querySelector('meta[name="twitter:image"]');
-        if (twitterImage) twitterImage.setAttribute('content', imgurUrl);
-
-        // Update URLs
-        let ogUrl = document.querySelector('meta[property="og:url"]');
-        if (ogUrl) ogUrl.setAttribute('content', window.location.href);
-
-        let twitterUrl = document.querySelector('meta[name="twitter:url"]');
-        if (twitterUrl) twitterUrl.setAttribute('content', window.location.href);
-
-        // Also update og:title to include the time
-        let ogTitle = document.querySelector('meta[property="og:title"]');
-        const titleText = `${timeText} - ${name} | Online Timer`;
-        if (ogTitle) ogTitle.setAttribute('content', titleText);
-
-        let twitterTitle = document.querySelector('meta[name="twitter:title"]');
-        if (twitterTitle) twitterTitle.setAttribute('content', titleText);
-
-        // Update Preview Image in UI with actual external URL to verify
-        if (ogPreviewImg) {
-            ogPreviewImg.src = imgurUrl;
-            ogPreviewImg.classList.remove('loading');
-        }
-        if (ogLoading) ogLoading.classList.add('hidden');
-
-        console.log('[OG] Metadata updated with Imgur URL');
-    } catch (e) {
-        console.error('[OG] Failed to upload/update metadata:', e);
-        if (ogLoading) ogLoading.classList.add('hidden');
-        if (ogPreviewImg) ogPreviewImg.classList.remove('loading');
+    } catch (error) {
+        console.error('Imgur upload error:', error);
+        return { success: false, error: error.message };
     }
 }
 
-// Hook into state changes that should trigger OG update
-// We'll throttled update or just update when sharing/loading
-const originalJoinRoom = joinRoom;
-joinRoom = async function (...args) {
-    const res = await originalJoinRoom.apply(this, args);
-    // Wait a bit for the first tick to update the display
-    setTimeout(updateOGMetadata, 100);
-    return res;
-};
+// Handle share with OG image generation
+async function handleShareWithOG() {
+    // Show preview container with loading
+    ogPreviewContainer.classList.remove('hidden');
+    ogLoading.classList.remove('hidden');
+    ogImageWrapper.classList.add('hidden');
 
-const originalShareBtnClick = shareBtn.onclick; // Wait, shareBtn uses addEventListener
-// I'll add a new listener instead or wrap the existing ones.
+    try {
+        // Generate OG image
+        const base64Image = await generateOGImage();
 
-shareBtn.addEventListener('click', () => {
-    updateOGMetadata();
-});
+        // Upload to Imgur
+        const result = await uploadToImgur(base64Image);
+
+        if (result.success) {
+            // Show the uploaded image
+            ogPreviewImage.src = result.url;
+            ogPreviewImage.onload = () => {
+                ogLoading.classList.add('hidden');
+                ogImageWrapper.classList.remove('hidden');
+            };
+            ogPreviewImage.onerror = () => {
+                // Fallback: show local preview if loading fails
+                ogPreviewImage.src = `data:image/png;base64,${base64Image}`;
+                ogLoading.classList.add('hidden');
+                ogImageWrapper.classList.remove('hidden');
+            };
+        } else {
+            // Show local preview if upload fails
+            console.warn('Using local preview due to upload failure');
+            ogPreviewImage.src = `data:image/png;base64,${base64Image}`;
+            ogLoading.classList.add('hidden');
+            ogImageWrapper.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('OG image generation error:', error);
+        // Hide preview on error
+        ogPreviewContainer.classList.add('hidden');
+    }
+}
+
+// Reset OG preview when modal closes
+function resetOGPreview() {
+    ogPreviewContainer.classList.add('hidden');
+    ogLoading.classList.remove('hidden');
+    ogImageWrapper.classList.add('hidden');
+    ogPreviewImage.src = '';
+}
 
 console.log('=== OnlineTimer App Script Loaded ===');
 init();
-

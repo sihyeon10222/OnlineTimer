@@ -9,20 +9,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://timeronline.me/">
-    <meta property="og:title" content="실시간 공유 웹 타이머 | TimerOnline">
-    <meta property="og:description" content="실시간으로 공유하고 동기화되는 웹 타이머/스톱워치입니다.">
-    <meta property="og:image" content="/og-image.png">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://timeronline.me/">
-    <meta property="twitter:title" content="실시간 공유 웹 타이머 | TimerOnline">
-    <meta property="twitter:description" content="실시간으로 공유하고 동기화되는 웹 타이머/스톱워치입니다.">
-    <meta property="twitter:image" content="/og-image.png">
 </head>
 
 <body>
@@ -191,15 +177,6 @@
                 <h3>링크 공유하기</h3>
                 <p id="share-subtitle">원하는 공유 방식을 선택하세요.</p>
 
-                <div id="og-preview-container" class="og-preview-container hidden">
-                    <label>미리보기</label>
-                    <div id="og-loading" class="og-loading hidden">
-                        <div class="spinner"></div>
-                        <span>이미지 생성 중...</span>
-                    </div>
-                    <img id="og-preview-img" src="" alt="OG Preview">
-                </div>
-
                 <div class="share-options">
                     <button id="share-online-btn" class="share-option-card">
                         <div class="icon">🔄</div>
@@ -216,6 +193,17 @@
                             <span>생성자 상태와 상관없이 종료/시작 시점 기준으로 계속 작동합니다.</span>
                         </div>
                     </button>
+                </div>
+
+                <!-- OG 이미지 미리보기 영역 -->
+                <div id="og-preview-container" class="og-preview-container hidden">
+                    <div id="og-loading" class="og-loading">
+                        <div class="og-spinner"></div>
+                        <span>이미지 생성 중...</span>
+                    </div>
+                    <div id="og-image-wrapper" class="og-image-wrapper hidden">
+                        <img id="og-preview-image" alt="OG Preview" />
+                    </div>
                 </div>
 
                 <button id="close-modal-btn" class="secondary-btn">닫기</button>
