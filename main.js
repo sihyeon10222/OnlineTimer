@@ -511,6 +511,39 @@ function joinRoom(id, params = new URLSearchParams()) {
     state.roomId = id;
     state.isStandalone = params.get('standalone') === 'true';
 
+    // 1. If Standalone, prioritize URL parameters for state hydration
+    if (state.isStandalone && params.get('t')) {
+        state.type = params.get('t');
+        if (state.type === 'countdown') {
+            state.countdownMode = params.get('m') || 'duration';
+        } else {
+            state.stopwatchMode = params.get('m') || 'immediate';
+        }
+        state.pauseTime = parseFloat(params.get('p')) || 0;
+        state.timerActive = params.get('a') === '1';
+        state.startTime = params.get('s') ? parseInt(params.get('s')) : null;
+        state.actualStartTime = params.get('ts') ? parseInt(params.get('ts')) : null;
+        state.duration = parseFloat(params.get('d')) || 0;
+        state.timerName = params.get('n') || '';
+
+        // Save to localStorage so it's recognized locally (Owner check will fail, which is correct for joiners)
+        const initialState = {
+            ...getSerializableState(),
+            isCreator: false,
+            roomId: id
+        };
+        localStorage.setItem(`timer_state_${id}`, JSON.stringify(initialState));
+
+        // Add to recent list
+        addTimerToList({
+            id: id,
+            type: state.type,
+            name: state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치'),
+            duration: state.duration,
+            createdAt: Date.now()
+        });
+    }
+
     // Ownership check via sessionStorage (scoped to this room/tab)
     const ownerToken = sessionStorage.getItem(`timer_owner_${id}`);
     state.isCreator = ownerToken === tabId;
@@ -804,11 +837,18 @@ function copyLink(standalone) {
     }
 
     const baseUrl = `${window.location.origin}${window.location.pathname}`;
-    let url = `${baseUrl}#/${state.roomId}`;
+    const params = new URLSearchParams();
+    params.set('standalone', 'true');
+    params.set('t', state.type);
+    params.set('m', state.type === 'countdown' ? state.countdownMode : state.stopwatchMode);
+    params.set('p', state.pauseTime);
+    params.set('a', state.timerActive ? '1' : '0');
+    if (state.startTime) params.set('s', state.startTime);
+    if (state.actualStartTime) params.set('ts', state.actualStartTime);
+    if (state.duration) params.set('d', state.duration);
+    if (state.timerName) params.set('n', state.timerName);
 
-    if (standalone) {
-        url += `?standalone=true`;
-    }
+    const url = `${baseUrl}#/${state.roomId}?${params.toString()}`;
 
     navigator.clipboard.writeText(url).then(() => {
         const btn = shareStandaloneBtn;
