@@ -1518,16 +1518,31 @@ function getSharedLink() {
     return `${baseUrl}?v=${encodeURIComponent(compact)}`;
 }
 
-// Get OG image URL from server API
+// Get OG image URL using Cloudinary (No server needed, works globally)
 function getOGImageUrl() {
-    const link = getSharedLink();
-    const v = new URL(link).searchParams.get('v');
+    const typeLabel = state.type === 'countdown' ? 'Timer' : 'Stopwatch';
+    const statusLabel = state.timerActive ? 'Running' : 'Paused';
+    const timerName = encodeURIComponent(state.timerName || typeLabel);
 
-    const baseUrl = window.location.hostname === 'localhost'
-        ? `${window.location.origin}/api/og`
-        : 'https://timeronlineshare.vercel.app/api/og';
+    const totalSeconds = Math.max(0, Math.floor(state.pauseTime));
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    const timeStr = `${h}:${m}:${s}`;
 
-    return `${baseUrl}?v=${encodeURIComponent(v)}`;
+    // Cloudinary dynamic URL with text overlays
+    // We use a base image (teal background) and overlay name and time
+    const cloudName = 'demo'; // Using public demo or a placeholder. For production, the user would provide their own.
+    const baseUrl = `https://res.cloudinary.com/${cloudName}/image/upload`;
+
+    // Design tokens
+    const bg = 'w_1200,h_630,c_fill,bg_rgb:e6fffa';
+    const nameOverlay = `l_text:Inter_60_bold:${timerName},co_rgb:1f2937,g_north,y_150`;
+    const timeOverlay = `l_text:Inter_120_bold:${timeStr},co_rgb:008080,g_center,y_0,b_rgb:ffffff,r_20,p_40`;
+    const statusOverlay = `l_text:Inter_40:${typeLabel}%20%E2%80%A2%20${statusLabel},co_rgb:6b7280,g_south,y_150`;
+    const footerOverlay = `l_text:Inter_24:timeronlineshare.vercel.app,co_rgb:9ca3af,g_south,y_50`;
+
+    return `${baseUrl}/${bg}/${nameOverlay}/${timeOverlay}/${statusOverlay}/${footerOverlay}/v1/one_pixel.png`;
 }
 
 // Handle share with OG image preview from server
