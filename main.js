@@ -1492,8 +1492,8 @@ const ogLoading = document.getElementById('og-loading');
 const ogImageWrapper = document.getElementById('og-image-wrapper');
 const ogPreviewImage = document.getElementById('og-preview-image');
 
-// Get OG image URL from server API
-function getOGImageUrl() {
+// Get shared link for standalone/OG mode
+function getSharedLink() {
     // Build the compact share data
     let flags = 0;
     if (state.type === 'stopwatch') flags |= 1;
@@ -1511,12 +1511,23 @@ function getOGImageUrl() {
     // Payload: [flags],[pause],[start],[actual],[duration],[name]
     const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
 
-    // Use the production URL for the API
-    const baseApiUrl = window.location.hostname === 'localhost'
+    const baseUrl = window.location.hostname === 'localhost'
+        ? `${window.location.origin}/api/share`
+        : 'https://timeronlineshare.vercel.app/api/share';
+
+    return `${baseUrl}?v=${encodeURIComponent(compact)}`;
+}
+
+// Get OG image URL from server API
+function getOGImageUrl() {
+    const link = getSharedLink();
+    const v = new URL(link).searchParams.get('v');
+
+    const baseUrl = window.location.hostname === 'localhost'
         ? `${window.location.origin}/api/og`
         : 'https://timeronlineshare.vercel.app/api/og';
 
-    return `${baseApiUrl}?v=${encodeURIComponent(compact)}`;
+    return `${baseUrl}?v=${encodeURIComponent(v)}`;
 }
 
 // Handle share with OG image preview from server
