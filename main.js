@@ -198,12 +198,8 @@ function setupListeners() {
         const typeName = state.type === 'countdown' ? '타이머' : '스톱워치';
         shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
         shareModal.classList.remove('hidden');
-        handleShareWithOG();
     });
-    closeShareModal.addEventListener('click', () => {
-        shareModal.classList.add('hidden');
-        resetOGPreview();
-    });
+    closeShareModal.addEventListener('click', () => shareModal.classList.add('hidden'));
     shareOnlineBtn.addEventListener('click', () => copyLink(false));
     shareStandaloneBtn.addEventListener('click', () => copyLink(true));
 
@@ -1484,102 +1480,6 @@ function updateThemeUI() {
         sunIcon.classList.add('hidden');
         moonIcon.classList.remove('hidden');
     }
-}
-
-// OG Image Preview Elements
-const ogPreviewContainer = document.getElementById('og-preview-container');
-const ogLoading = document.getElementById('og-loading');
-const ogImageWrapper = document.getElementById('og-image-wrapper');
-const ogPreviewImage = document.getElementById('og-preview-image');
-
-// Get shared link for standalone/OG mode
-function getSharedLink() {
-    // Build the compact share data
-    let flags = 0;
-    if (state.type === 'stopwatch') flags |= 1;
-    const mode = state.type === 'countdown' ? state.countdownMode : state.stopwatchMode;
-    if (mode === 'target') flags |= 2;
-    if (state.timerActive) flags |= 4;
-
-    const EPOCH = 1735689600000; // 2025-01-01
-    const p = toB64(Math.floor(state.pauseTime * 1000));
-    const s = state.startTime ? toB64(state.startTime - EPOCH) : '';
-    const ts = (state.actualStartTime === state.startTime && state.actualStartTime) ? '-' : (state.actualStartTime ? toB64(state.actualStartTime - EPOCH) : '');
-    const d = (state.duration === state.pauseTime || !state.duration) ? '-' : toB64(Math.floor(state.duration * 1000));
-    const n = encodeURIComponent(state.timerName || '');
-
-    // Payload: [flags],[pause],[start],[actual],[duration],[name]
-    const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
-
-    const baseUrl = window.location.hostname === 'localhost'
-        ? `${window.location.origin}/api/share`
-        : 'https://timeronlineshare.vercel.app/api/share';
-
-    return `${baseUrl}?v=${encodeURIComponent(compact)}`;
-}
-
-// Get OG image URL using Cloudinary (No server needed, works globally)
-function getOGImageUrl() {
-    const typeLabel = state.type === 'countdown' ? 'Timer' : 'Stopwatch';
-    const statusLabel = state.timerActive ? 'Running' : 'Paused';
-    const timerName = encodeURIComponent(state.timerName || typeLabel);
-
-    const totalSeconds = Math.max(0, Math.floor(state.pauseTime));
-    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    const timeStr = `${h}:${m}:${s}`;
-
-    // Cloudinary dynamic URL with text overlays
-    // We use a base image (teal background) and overlay name and time
-    const cloudName = 'demo'; // Using public demo or a placeholder. For production, the user would provide their own.
-    const baseUrl = `https://res.cloudinary.com/${cloudName}/image/upload`;
-
-    // Design tokens
-    const bg = 'w_1200,h_630,c_fill,bg_rgb:e6fffa';
-    const nameOverlay = `l_text:Inter_60_bold:${timerName},co_rgb:1f2937,g_north,y_150`;
-    const timeOverlay = `l_text:Inter_120_bold:${timeStr},co_rgb:008080,g_center,y_0,b_rgb:ffffff,r_20,p_40`;
-    const statusOverlay = `l_text:Inter_40:${typeLabel}%20%E2%80%A2%20${statusLabel},co_rgb:6b7280,g_south,y_150`;
-    const footerOverlay = `l_text:Inter_24:timeronlineshare.vercel.app,co_rgb:9ca3af,g_south,y_50`;
-
-    return `${baseUrl}/${bg}/${nameOverlay}/${timeOverlay}/${statusOverlay}/${footerOverlay}/v1/one_pixel.png`;
-}
-
-// Handle share with OG image preview from server
-async function handleShareWithOG() {
-    // Show preview container with loading
-    ogPreviewContainer.classList.remove('hidden');
-    ogLoading.classList.remove('hidden');
-    ogImageWrapper.classList.add('hidden');
-
-    try {
-        // Get OG image URL from server
-        const ogImageUrl = getOGImageUrl();
-
-        // Load the image from server
-        ogPreviewImage.src = ogImageUrl;
-        ogPreviewImage.onload = () => {
-            ogLoading.classList.add('hidden');
-            ogImageWrapper.classList.remove('hidden');
-        };
-        ogPreviewImage.onerror = (e) => {
-            console.error('Failed to load OG image from server:', e);
-            // Hide on error
-            ogLoading.classList.add('hidden');
-            ogPreviewContainer.classList.add('hidden');
-        };
-    } catch (error) {
-        console.error('OG image preview error:', error);
-        ogPreviewContainer.classList.add('hidden');
-    }
-}
-
-// Reset OG preview when modal closes
-function resetOGPreview() {
-    ogPreviewContainer.classList.add('hidden');
-    ogLoading.classList.remove('hidden');
-    ogImageWrapper.classList.add('hidden');
-    ogPreviewImage.src = '';
 }
 
 console.log('=== OnlineTimer App Script Loaded ===');

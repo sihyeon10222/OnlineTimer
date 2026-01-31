@@ -5,36 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>실시간 공유 웹 타이머 | TimerOnline</title>
-
-    <!-- OG Meta Tags -->
-    <meta property="og:title" content="실시간 공유 타이머 | TimerOnline" id="og-title">
-    <meta property="og:description" content="실시간으로 동기화되는 온라인 타이머" id="og-description">
-    <meta property="og:image" content="https://timeronlineshare.vercel.app/api/og" id="og-image">
-    <meta property="og:url" content="https://timeronlineshare.vercel.app" id="og-url">
-    <meta property="og:type" content="website">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="https://timeronlineshare.vercel.app/api/og" id="twitter-image">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
-
-    <!-- Dynamic OG Image Script -->
-    <script>
-        (function () {
-            const hash = window.location.hash;
-            if (hash.startsWith('#*')) {
-                const v = hash.substring(2);
-                const baseUrl = 'https://timeronlineshare.vercel.app';
-                const ogImageUrl = `${baseUrl}/api/og?v=${encodeURIComponent(v)}`;
-
-                document.getElementById('og-image').setAttribute('content', ogImageUrl);
-                document.getElementById('twitter-image').setAttribute('content', ogImageUrl);
-                document.getElementById('og-url').setAttribute('content', window.location.href);
-            }
-        })();
-    </script>
 </head>
 
 <body>
@@ -219,17 +193,6 @@
                             <span>생성자 상태와 상관없이 종료/시작 시점 기준으로 계속 작동합니다.</span>
                         </div>
                     </button>
-                </div>
-
-                <!-- OG 이미지 미리보기 영역 -->
-                <div id="og-preview-container" class="og-preview-container hidden">
-                    <div id="og-loading" class="og-loading">
-                        <div class="og-spinner"></div>
-                        <span>이미지 생성 중...</span>
-                    </div>
-                    <div id="og-image-wrapper" class="og-image-wrapper hidden">
-                        <img id="og-preview-image" alt="OG Preview" />
-                    </div>
                 </div>
 
                 <button id="close-modal-btn" class="secondary-btn">닫기</button>
