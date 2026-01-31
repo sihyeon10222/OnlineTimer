@@ -1,36 +1,39 @@
 import { ImageResponse } from '@vercel/og';
 
-export default async function handler(req) {
+export const config = {
+    runtime: 'edge',
+};
+
+function fromB64(s) {
+    if (!s) return 0;
+    const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let res = 0;
+    for (let i = 0; i < s.length; i++) {
+        res = res * 64 + B64_CHARS.indexOf(s[i]);
+    }
+    return res;
+}
+
+function parseTimerState(v) {
+    if (!v) return null;
+    const parts = v.split(',');
+    if (parts.length < 2) return null;
+    const flags = fromB64(parts[0]);
+    return {
+        type: (flags & 1) ? 'stopwatch' : 'countdown',
+        isActive: !!(flags & 4),
+        pauseTime: fromB64(parts[1]) / 1000 || 0,
+        timerName: parts[5] ? decodeURIComponent(parts[5]) : ''
+    };
+}
+
+export default function handler(req) {
     try {
-        const { searchParams } = new URL(req.url, 'https://timeronlineshare.vercel.app');
+        const { searchParams } = new URL(req.url);
         const v = searchParams.get('v');
+        const state = parseTimerState(v) || { type: 'countdown', isActive: false, pauseTime: 0, timerName: '' };
 
-        // Helper inline functions to avoid dependencies
-        const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-        const fromB64 = (s) => {
-            if (!s) return 0;
-            let res = 0;
-            for (let i = 0; i < s.length; i++) {
-                res = res * 64 + B64_CHARS.indexOf(s[i]);
-            }
-            return res;
-        };
-
-        const parseTimerState = (v) => {
-            if (!v) return null;
-            const parts = v.split(',');
-            if (parts.length < 2) return null;
-            const flags = fromB64(parts[0]);
-            return {
-                type: (flags & 1) ? 'stopwatch' : 'countdown',
-                isActive: !!(flags & 4),
-                pauseTime: fromB64(parts[1]) / 1000 || 0,
-                timerName: parts[5] ? decodeURIComponent(parts[5]) : ''
-            };
-        };
-
-        const state = parseTimerState(v) || { type: 'countdown', isActive: false, pauseTime: 600, timerName: '' };
-        const totalSeconds = Math.floor(state.pauseTime);
+        const totalSeconds = Math.max(0, Math.floor(state.pauseTime));
         const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
         const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
         const s = (totalSeconds % 60).toString().padStart(2, '0');
@@ -38,7 +41,6 @@ export default async function handler(req) {
 
         const typeLabel = state.type === 'countdown' ? '타이머' : '스톱워치';
         const statusLabel = state.isActive ? '진행 중' : '일시정지';
-        const timerName = state.timerName || typeLabel;
 
         return new ImageResponse(
             (
@@ -55,12 +57,11 @@ export default async function handler(req) {
                     }}
                 >
                     <div style={{ fontSize: 40, fontWeight: 'bold', color: '#008080', marginBottom: 20 }}>Online Timer</div>
-                    <div style={{ fontSize: 50, fontWeight: 'bold', color: '#1f2937', marginBottom: 40 }}>{timerName}</div>
+                    <div style={{ fontSize: 50, fontWeight: 'bold', color: '#1f2937', marginBottom: 40 }}>{state.timerName || typeLabel}</div>
                     <div style={{ display: 'flex', padding: '40px 80px', backgroundColor: 'white', borderRadius: '30px', border: '4px solid #008080' }}>
                         <div style={{ fontSize: 100, fontWeight: 900, color: '#0d9488' }}>{timeStr}</div>
                     </div>
                     <div style={{ fontSize: 36, color: '#6b7280', marginTop: 40 }}>{typeLabel} • {statusLabel}</div>
-                    <div style={{ position: 'absolute', bottom: 40, fontSize: 24, color: '#9ca3af' }}>timeronlineshare.vercel.app</div>
                 </div>
             ),
             { width: 1200, height: 630 }
