@@ -4,15 +4,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Timer | 웹 타이머</title>
+    <title>실시간 공유 웹 타이머 | TimerOnline</title>
 
-    <meta name="title" content="Online Timer | 웹 타이머">
-    <meta name="description" content="간편한 웹 타이머. 카운트다운, 스톱워치 기능을 지원하며 링크로 공유할 수 있습니다.">
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="실시간 공유 웹 타이머 | TimerOnline">
+    <meta name="description" content="실시간으로 공유하고 함께 보는 타이머. 카운트다운, 스톱워치 기능을 지원하며 실시간 동기화로 어디서든 함께 확인하세요.">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://timeronline.vercel.app/">
+    <meta property="og:title" content="실시간 공유 웹 타이머 | TimerOnline">
+    <meta property="og:description" content="실시간으로 공유하고 함께 보는 타이머. 카운트다운, 스톱워치 기능을 지원하며 실시간 동기화로 어디서든 함께 확인하세요.">
+    <meta property="og:image" content="https://i.imgur.com/kk9oYux.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://timeronline.vercel.app/">
+    <meta property="twitter:title" content="실시간 공유 웹 타이머 | TimerOnline">
+    <meta property="twitter:description" content="실시간으로 공유하고 함께 보는 타이머. 카운트다운, 스톱워치 기능을 지원하며 실시간 동기화로 어디서든 함께 확인하세요.">
+    <meta property="twitter:image" content="https://i.imgur.com/kk9oYux.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/style.css">
+  <script type="module" crossorigin src="/assets/index-Du2UAoYF.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DdpjCH_Z.css">
 </head>
 
 <body>
@@ -36,13 +52,13 @@
                 <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
             </svg>
         </button>
-
-        <!-- Landing View -->
+        <!-- Views will be injected here -->
         <div id="landing-view" class="view">
             <header>
                 <h1>Online Timer</h1>
-                <p>간편한 웹 타이머</p>
+                <p>실시간 공유 타이머</p>
             </header>
+
 
             <main class="card">
                 <div class="timer-type-selector">
@@ -120,6 +136,7 @@
                     </div>
                 </div>
 
+
                 <div class="input-group">
                     <label>이름 (선택)</label>
                     <input type="text" id="timer-name-input" placeholder="타이머 이름을 입력하세요" maxlength="30">
@@ -128,15 +145,15 @@
                 <button id="create-btn" class="primary-btn">타이머 생성하기</button>
             </main>
 
-            <!-- Timer List Section -->
+            <!-- Timer List Section moved to bottom -->
             <section id="timer-list-section" class="timer-list-section hidden">
                 <h2>내 타이머 목록</h2>
                 <div id="timer-list-container" class="timer-list-container">
+                    <!-- Timer list items will be inserted here -->
                 </div>
             </section>
         </div>
 
-        <!-- Timer View -->
         <div id="timer-view" class="view hidden">
             <header>
                 <div class="header-left">
@@ -149,7 +166,7 @@
                         </svg>
                     </button>
                 </div>
-                <button id="share-btn" class="secondary-btn">링크 복사</button>
+                <button id="share-btn" class="secondary-btn">링크 공유</button>
             </header>
             <main>
                 <div class="timer-container">
@@ -163,12 +180,45 @@
                     <button id="toggle-btn" class="control-btn primary">시작</button>
                     <button id="change-target-btn" class="control-btn primary hidden">종료 시점 변경</button>
                 </div>
+                <div id="viewer-controls" class="viewer-message hidden">
+                    <p>호스트가 타이머를 제어하고 있습니다.</p>
+                </div>
 
                 <div id="timer-info" class="timer-info"></div>
+
+                <div class="status-indicator">
+                    <span id="sync-status" class="status-dot"></span>
+                    <span id="sync-text">동기화 중...</span>
+                </div>
             </main>
         </div>
+        <div id="share-modal" class="modal hidden">
+            <div class="modal-content card">
+                <h3>링크 공유하기</h3>
+                <p id="share-subtitle">원하는 공유 방식을 선택하세요.</p>
 
-        <!-- Change Target Modal -->
+                <div class="share-options">
+                    <button id="share-online-btn" class="share-option-card">
+                        <div class="icon">🔄</div>
+                        <div class="details">
+                            <strong>실시간 동기화 공유</strong>
+                            <span>생성자의 시작/정지 상태와 실시간으로 연동됩니다.</span>
+                        </div>
+                    </button>
+
+                    <button id="share-standalone-btn" class="share-option-card">
+                        <div class="icon">🕒</div>
+                        <div class="details">
+                            <strong id="share-standalone-label">링크 공유</strong>
+                            <span>생성자 상태와 상관없이 종료/시작 시점 기준으로 계속 작동합니다.</span>
+                        </div>
+                    </button>
+                </div>
+
+                <button id="close-modal-btn" class="secondary-btn">닫기</button>
+            </div>
+        </div>
+
         <div id="change-target-modal" class="modal hidden">
             <div class="modal-content card">
                 <h3>종료 시점 변경</h3>
@@ -198,7 +248,6 @@
             </div>
         </div>
     </div>
-    <script type="module" src="/main.js"></script>
 </body>
 
 </html>

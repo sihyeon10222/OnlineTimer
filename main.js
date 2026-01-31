@@ -1,3 +1,4 @@
+// Short ID Generator
 function generateShortId(length = 6) {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -7,7 +8,7 @@ function generateShortId(length = 6) {
     return result;
 }
 
-// Ultra-compression helpers
+// Base64 URL-safe encoding helpers for compact share links
 const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 function toB64(n) {
     if (n === 0 || n === null || isNaN(n)) return "";
@@ -27,47 +28,16 @@ function fromB64(s) {
     return res;
 }
 
-// Firebase Configuration - User should replace this with their own
-const firebaseConfig = {
-    apiKey: "DEMO_KEY",
-    authDomain: "online-timer-demo.firebaseapp.com",
-    databaseURL: "https://online-timer-demo-default-rtdb.firebaseio.com",
-    projectId: "online-timer-demo",
-    storageBucket: "online-timer-demo.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef"
-};
-
-// Initialize Firebase (wrapped in try-catch to allow local demo if config is invalid)
-let db;
-try {
-    const app = initializeApp(firebaseConfig);
-    db = getDatabase(app);
-} catch (e) {
-    console.warn("Firebase initialization failed. Using local mode.", e);
-}
-
-// Generate or retrieve a unique ID for this specific tab instance
-// window.name persists across reloads but is not usually copied to new tabs like sessionStorage is.
-if (!window.name || !window.name.startsWith('OnlineTimer_')) {
-    window.name = 'OnlineTimer_' + generateShortId(12);
-}
-const tabId = window.name;
-
-// Simple State Manager
+// State Manager
 const state = {
     view: 'landing',
     type: 'countdown',
-    countdownMode: 'duration', // 'duration' or 'target'
-    roomId: null,
-    isCreator: false,
+    countdownMode: 'duration',
+    timerId: null,
     timerActive: false,
     startTime: null,
     pauseTime: 0,
     duration: 600,
-    remoteState: null,
-    isStandalone: false,
-    bc: null,
     stopwatchMode: 'immediate',
     actualStartTime: null,
     timerName: '',
@@ -90,13 +60,10 @@ const toggleBtn = document.getElementById('toggle-btn');
 const resetBtn = document.getElementById('reset-btn');
 const backBtn = document.getElementById('back-to-home');
 const shareBtn = document.getElementById('share-btn');
-const roomIdDisplay = document.getElementById('room-id-display');
-const syncStatus = document.getElementById('sync-status');
 const typeLabel = document.getElementById('timer-type-label');
 const controls = document.getElementById('controls');
-const viewerControls = document.getElementById('viewer-controls');
 
-// New UI Elements for target mode
+// Target mode elements
 const modeDuration = document.getElementById('mode-duration');
 const modeTarget = document.getElementById('mode-target');
 const durationInputGroup = document.getElementById('duration-input-group');
@@ -107,7 +74,7 @@ const targetHourInput = document.getElementById('target-hour');
 const targetMinuteInput = document.getElementById('target-minute');
 const targetSecondInput = document.getElementById('target-second');
 
-// New UI Elements for stopwatch target mode
+// Stopwatch target mode elements
 const swModeImmediate = document.getElementById('sw-mode-immediate');
 const swModeTarget = document.getElementById('sw-mode-target');
 const swTargetInputGroup = document.getElementById('sw-target-input-group');
@@ -123,14 +90,6 @@ const timerNameDisplay = document.getElementById('timer-name-display');
 // Timer List Elements
 const timerListSection = document.getElementById('timer-list-section');
 const timerListContainer = document.getElementById('timer-list-container');
-
-// Modal Elements
-const shareModal = document.getElementById('share-modal');
-const closeShareModal = document.getElementById('close-modal-btn');
-const shareOnlineBtn = document.getElementById('share-online-btn');
-const shareStandaloneBtn = document.getElementById('share-standalone-btn');
-const shareSubtitle = document.getElementById('share-subtitle');
-const shareStandaloneLabel = document.getElementById('share-standalone-label');
 
 // Change Target Modal Elements
 const changeTargetBtn = document.getElementById('change-target-btn');
@@ -156,17 +115,17 @@ function init() {
     setupListeners();
     startTicker();
     loadTimerList();
+    initDefaultTargetTime();
+}
 
-    // Set default target time to +1 hour
+function initDefaultTargetTime() {
     const now = new Date();
     now.setHours(now.getHours() + 1);
 
     let hours = now.getHours();
     const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12; // 0 should be 12
+    hours = hours % 12 || 12;
 
-    // Correctly get local date string (YYYY-MM-DD)
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
@@ -177,7 +136,6 @@ function init() {
     targetMinuteInput.value = now.getMinutes().toString().padStart(2, '0');
     targetSecondInput.value = '00';
 
-    // Duplicate for stopwatch
     swTargetDateInput.value = `${year}-${month}-${day}`;
     swTargetAmpmInput.value = ampm;
     swTargetHourInput.value = hours;
@@ -194,19 +152,12 @@ function setupListeners() {
     backBtn.addEventListener('click', () => window.location.hash = '');
     toggleBtn.addEventListener('click', toggleTimer);
     resetBtn.addEventListener('click', resetTimer);
-    shareBtn.addEventListener('click', () => {
-        const typeName = state.type === 'countdown' ? '타이머' : '스톱워치';
-        shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
-        shareModal.classList.remove('hidden');
-    });
-    closeShareModal.addEventListener('click', () => shareModal.classList.add('hidden'));
-    shareOnlineBtn.addEventListener('click', () => copyLink(false));
-    shareStandaloneBtn.addEventListener('click', () => copyLink(true));
+    shareBtn.addEventListener('click', copyShareLink);
 
     swModeImmediate.addEventListener('click', () => setStopwatchMode('immediate'));
     swModeTarget.addEventListener('click', () => setStopwatchMode('target'));
 
-    // Constraint enforcement for duration inputs
+    // Input range enforcement
     const enforceRange = (el, min, max) => {
         el.addEventListener('input', () => {
             let val = parseInt(el.value);
@@ -229,149 +180,82 @@ function setupListeners() {
     enforceRange(swTargetMinuteInput, 0, 59);
     enforceRange(swTargetSecondInput, 0, 59);
 
-    // Auto-conversion logic for 24h -> 12h + AM/PM with 0.3s delay
+    // Auto 24h -> 12h conversion
     let conversionTimeout;
-    targetHourInput.addEventListener('input', (e) => {
-        clearTimeout(conversionTimeout);
+    const setupHourConversion = (hourInput, ampmInput) => {
+        hourInput.addEventListener('input', (e) => {
+            clearTimeout(conversionTimeout);
+            const val = parseInt(e.target.value);
+            if (isNaN(val)) return;
+            conversionTimeout = setTimeout(() => {
+                if (val >= 13 && val <= 23) {
+                    ampmInput.value = 'PM';
+                    hourInput.value = val - 12;
+                } else if (val === 0) {
+                    ampmInput.value = 'AM';
+                    hourInput.value = 12;
+                } else if (val === 12) {
+                    ampmInput.value = 'PM';
+                } else if (val >= 24) {
+                    hourInput.value = 12;
+                }
+            }, 300);
+        });
+    };
 
-        const val = parseInt(e.target.value);
-        if (isNaN(val)) return;
+    setupHourConversion(targetHourInput, targetAmpmInput);
+    setupHourConversion(swTargetHourInput, swTargetAmpmInput);
+    setupHourConversion(newTargetHour, newTargetAmpm);
 
-        conversionTimeout = setTimeout(() => {
-            if (val >= 13 && val <= 23) {
-                targetAmpmInput.value = 'PM';
-                targetHourInput.value = val - 12;
-            } else if (val === 0) {
-                targetAmpmInput.value = 'AM';
-                targetHourInput.value = 12;
-            } else if (val === 12) {
-                targetAmpmInput.value = 'PM';
-            } else if (val >= 24) {
-                targetHourInput.value = 12; // Cap at 12
-            }
-        }, 300);
-    });
+    // Minute blur formatting
+    const formatMinuteOnBlur = (el) => {
+        el.addEventListener('blur', (e) => {
+            let val = parseInt(e.target.value);
+            if (isNaN(val)) e.target.value = '00';
+            else e.target.value = Math.min(59, Math.max(0, val)).toString().padStart(2, '0');
+        });
+    };
 
-    // Ensure minute is always 0-59
-    targetMinuteInput.addEventListener('blur', (e) => {
-        let val = parseInt(e.target.value);
-        if (isNaN(val)) e.target.value = '00';
-        else e.target.value = Math.min(59, Math.max(0, val)).toString().padStart(2, '0');
-    });
+    formatMinuteOnBlur(targetMinuteInput);
+    formatMinuteOnBlur(swTargetMinuteInput);
 
-    // Auto-conversion for stopwatch inputs
-    swTargetHourInput.addEventListener('input', (e) => {
-        clearTimeout(conversionTimeout);
-        const val = parseInt(e.target.value);
-        if (isNaN(val)) return;
-        conversionTimeout = setTimeout(() => {
-            if (val >= 13 && val <= 23) {
-                swTargetAmpmInput.value = 'PM';
-                swTargetHourInput.value = val - 12;
-            } else if (val === 0) {
-                swTargetAmpmInput.value = 'AM';
-                swTargetHourInput.value = 12;
-            } else if (val === 12) {
-                swTargetAmpmInput.value = 'PM';
-            } else if (val >= 24) {
-                swTargetHourInput.value = 12;
-            }
-        }, 300);
-    });
-
-    swTargetMinuteInput.addEventListener('blur', (e) => {
-        let val = parseInt(e.target.value);
-        if (isNaN(val)) e.target.value = '00';
-        else e.target.value = Math.min(59, Math.max(0, val)).toString().padStart(2, '0');
-    });
-
-    // Change Target Modal listeners
-    changeTargetBtn.addEventListener('click', () => {
-        if (state.startTime && state.pauseTime) {
-            const endPoint = new Date(state.startTime + state.pauseTime * 1000);
-            newTargetDate.value = endPoint.toISOString().split('T')[0];
-            let hours = endPoint.getHours();
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            newTargetAmpm.value = ampm;
-            newTargetHour.value = hours;
-            newTargetMinute.value = endPoint.getMinutes().toString().padStart(2, '0');
-            newTargetSecond.value = endPoint.getSeconds().toString().padStart(2, '0');
-        }
-        changeTargetModal.classList.remove('hidden');
-    });
+    // Change Target Modal
+    changeTargetBtn.addEventListener('click', openChangeTargetModal);
     cancelChangeBtn.addEventListener('click', () => changeTargetModal.classList.add('hidden'));
     confirmChangeBtn.addEventListener('click', applyNewTarget);
 
     enforceRange(newTargetHour, 1, 12);
     enforceRange(newTargetMinute, 0, 59);
     enforceRange(newTargetSecond, 0, 59);
-
-    // Auto-conversion for new target modal
-    newTargetHour.addEventListener('input', (e) => {
-        clearTimeout(conversionTimeout);
-        const val = parseInt(e.target.value);
-        if (isNaN(val)) return;
-        conversionTimeout = setTimeout(() => {
-            if (val >= 13 && val <= 23) {
-                newTargetAmpm.value = 'PM';
-                newTargetHour.value = val - 12;
-            } else if (val === 0) {
-                newTargetAmpm.value = 'AM';
-                newTargetHour.value = 12;
-            } else if (val === 12) {
-                newTargetAmpm.value = 'PM';
-            } else if (val >= 24) {
-                newTargetHour.value = 12;
-            }
-        }, 300);
-    });
 }
 
 function setCountdownMode(mode) {
     state.countdownMode = mode;
-    if (mode === 'duration') {
-        modeDuration.classList.add('active');
-        modeTarget.classList.remove('active');
-        durationInputGroup.classList.remove('hidden');
-        targetInputGroup.classList.add('hidden');
-    } else {
-        modeTarget.classList.add('active');
-        modeDuration.classList.remove('active');
-        targetInputGroup.classList.remove('hidden');
-        durationInputGroup.classList.add('hidden');
-    }
+    modeDuration.classList.toggle('active', mode === 'duration');
+    modeTarget.classList.toggle('active', mode === 'target');
+    durationInputGroup.classList.toggle('hidden', mode !== 'duration');
+    targetInputGroup.classList.toggle('hidden', mode !== 'target');
 }
 
 function setStopwatchMode(mode) {
     state.stopwatchMode = mode;
-    if (mode === 'immediate') {
-        swModeImmediate.classList.add('active');
-        swModeTarget.classList.remove('active');
-        swTargetInputGroup.classList.add('hidden');
-        createBtn.textContent = '스톱워치 시작하기';
-    } else {
-        swModeTarget.classList.add('active');
-        swModeImmediate.classList.remove('active');
-        swTargetInputGroup.classList.remove('hidden');
-        createBtn.textContent = '스톱워치 생성하기';
-    }
+    swModeImmediate.classList.toggle('active', mode === 'immediate');
+    swModeTarget.classList.toggle('active', mode === 'target');
+    swTargetInputGroup.classList.toggle('hidden', mode !== 'target');
+    createBtn.textContent = mode === 'immediate' ? '스톱워치 시작하기' : '스톱워치 생성하기';
 }
 
 function setType(type) {
     state.type = type;
+    typeCountdown.classList.toggle('active', type === 'countdown');
+    typeStopwatch.classList.toggle('active', type === 'stopwatch');
+    countdownSettings.classList.toggle('hidden', type !== 'countdown');
+    stopwatchSettings.classList.toggle('hidden', type !== 'stopwatch');
+
     if (type === 'countdown') {
-        typeCountdown.classList.add('active');
-        typeStopwatch.classList.remove('active');
-        countdownSettings.classList.remove('hidden');
-        stopwatchSettings.classList.add('hidden');
         createBtn.textContent = '타이머 생성하기';
         timerNameInput.placeholder = '타이머 이름을 입력하세요';
     } else {
-        typeStopwatch.classList.add('active');
-        typeCountdown.classList.remove('active');
-        countdownSettings.classList.add('hidden');
-        stopwatchSettings.classList.remove('hidden');
         setStopwatchMode(state.stopwatchMode);
         timerNameInput.placeholder = '스톱워치 이름을 입력하세요';
     }
@@ -379,22 +263,17 @@ function setType(type) {
 
 function handleRoute() {
     const hash = window.location.hash;
-    console.log('[Timer] Route changed:', hash);
 
-    // Support ultra-short standalone formats: #* (base64) or #/+ (base36)
-    if (hash.startsWith('#*') || hash.startsWith('#/+')) {
-        const isNew = hash.startsWith('#*');
-        const data = hash.substring(isNew ? 2 : 3);
-        joinRoom('standalone', new URLSearchParams(`v=${data}`));
+    // Compact share link format: #*[base64 data]
+    if (hash.startsWith('#*')) {
+        const data = hash.substring(2);
+        loadFromShareLink(data);
         return;
     }
 
     if (hash.startsWith('#/')) {
-        const fullPath = hash.substring(2);
-        const [rawId, search] = fullPath.split('?');
-        const id = rawId.replace(/\/$/, ''); // Strip trailing slash
-        const params = new URLSearchParams(search);
-        joinRoom(id, params);
+        const id = hash.substring(2).replace(/\/$/, '');
+        loadTimer(id);
     } else {
         showLanding();
     }
@@ -405,21 +284,24 @@ function showLanding() {
     landingView.classList.remove('hidden');
     timerView.classList.add('hidden');
     state.timerActive = false;
-    state.roomId = null;
-    state.isCreator = false;
-    setType('countdown'); // Reset to default mode visually and in state
+    state.timerId = null;
+    setType('countdown');
 }
 
-function showTimer(id) {
+function showTimer() {
     state.view = 'timer';
     landingView.classList.add('hidden');
     timerView.classList.remove('hidden');
+    controls.classList.remove('hidden');
+
+    typeLabel.textContent = state.type === 'countdown' ? '타이머' : '스톱워치';
+    timerNameDisplay.textContent = state.timerName;
+    updateToggleButton();
 }
 
-async function createTimer() {
+function createTimer() {
     const id = generateShortId(6);
-    state.isCreator = true;
-    state.roomId = id;
+    state.timerId = id;
 
     let initialSeconds = 0;
     let autoStart = false;
@@ -436,20 +318,9 @@ async function createTimer() {
                 return;
             }
             state.startTime = Date.now();
-            autoStart = false; // Duration timer starts paused usually
+            autoStart = false;
         } else {
-            const dateVal = targetDateInput.value;
-            let hourVal = parseInt(targetHourInput.value) || 12;
-            const minuteVal = targetMinuteInput.value || '00';
-            const secondVal = targetSecondInput.value || '00';
-            const ampm = targetAmpmInput.value;
-
-            // Convert to 24h format
-            if (ampm === 'PM' && hourVal < 12) hourVal += 12;
-            if (ampm === 'AM' && hourVal === 12) hourVal = 0;
-
-            const targetDate = new Date(`${dateVal}T${hourVal.toString().padStart(2, '0')}:${minuteVal.padStart(2, '0')}:${secondVal.padStart(2, '0')}`);
-            const targetTime = targetDate.getTime();
+            const targetTime = getTargetTimeFromInputs(targetDateInput, targetHourInput, targetMinuteInput, targetSecondInput, targetAmpmInput);
             const now = Date.now();
             initialSeconds = Math.max(0, (targetTime - now) / 1000);
             state.startTime = now;
@@ -457,26 +328,15 @@ async function createTimer() {
             autoStart = true;
         }
     } else {
-        // Stopwatch mode
         if (state.stopwatchMode === 'immediate') {
             initialSeconds = 0;
             autoStart = true;
             state.startTime = Date.now();
             state.actualStartTime = state.startTime;
         } else {
-            const dateVal = swTargetDateInput.value;
-            let hourVal = parseInt(swTargetHourInput.value) || 12;
-            const minuteVal = swTargetMinuteInput.value || '00';
-            const secondVal = swTargetSecondInput.value || '00';
-            const ampm = swTargetAmpmInput.value;
-
-            // Convert to 24h format
-            if (ampm === 'PM' && hourVal < 12) hourVal += 12;
-            if (ampm === 'AM' && hourVal === 12) hourVal = 0;
-
-            const targetDate = new Date(`${dateVal}T${hourVal.toString().padStart(2, '0')}:${minuteVal.padStart(2, '0')}:${secondVal.padStart(2, '0')}`);
-            state.startTime = targetDate.getTime();
-            state.actualStartTime = state.startTime;
+            const targetTime = getTargetTimeFromInputs(swTargetDateInput, swTargetHourInput, swTargetMinuteInput, swTargetSecondInput, swTargetAmpmInput);
+            state.startTime = targetTime;
+            state.actualStartTime = targetTime;
             initialSeconds = 0;
             autoStart = true;
         }
@@ -487,41 +347,7 @@ async function createTimer() {
     state.duration = initialSeconds;
     state.timerName = timerNameInput.value.trim();
 
-    const initialState = {
-        type: state.type,
-        active: state.timerActive,
-        pauseTime: state.pauseTime,
-        startTime: state.startTime,
-        actualStartTime: state.actualStartTime,
-        duration: state.duration,
-        timerName: state.timerName,
-        countdownMode: state.countdownMode,
-        isCreator: true,
-        roomId: id
-    };
-
-    sessionStorage.setItem(`timer_owner_${id}`, tabId);
-    localStorage.setItem(`timer_state_${id}`, JSON.stringify(initialState));
-
-    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        await set(ref(db, 'timers/' + id), {
-            type: state.type,
-            active: state.timerActive,
-            pauseTime: state.pauseTime,
-            startTime: state.startTime,
-            actualStartTime: state.actualStartTime,
-            duration: state.duration,
-            timerName: state.timerName,
-            countdownMode: state.countdownMode,
-            createdAt: serverTimestamp()
-        });
-    }
-
-    // Reset button states for new timer
-    toggleBtn.classList.remove('hidden');
-    resetBtn.classList.remove('full-width');
-
-    // Add to timer list
+    saveTimerState(id);
     addTimerToList({
         id: id,
         type: state.type,
@@ -530,406 +356,92 @@ async function createTimer() {
         createdAt: Date.now()
     });
 
+    toggleBtn.classList.remove('hidden');
+    resetBtn.classList.remove('full-width');
+
     window.location.hash = `/${id}`;
 }
-function joinRoom(id, params = new URLSearchParams()) {
-    console.log(`[Timer] Entering joinRoom for ID: ${id}`);
-    state.roomId = id;
-    state.isStandalone = id === 'standalone' || params.has('v') || params.get('standalone') === 'true';
 
-    // 1. If Standalone, prioritize URL parameters for state hydration
-    const v = params.get('v');
-    if (v) {
-        // Detect separator: new format uses ',', old uses '!'
-        const isB64 = !v.includes('!');
-        const sep = isB64 ? ',' : '!';
-        const parts = v.split(sep);
-
-        if (parts.length >= 2) {
-            const flags = isB64 ? fromB64(parts[0]) : parseInt(parts[0], 36);
-            // bits: 0:type (0:c, 1:s), 1:mode, 2:active
-            state.type = (flags & 1) ? 'stopwatch' : 'countdown';
-            const modeBit = (flags & 2);
-            if (state.type === 'countdown') {
-                state.countdownMode = modeBit ? 'target' : 'duration';
-            } else {
-                state.stopwatchMode = modeBit ? 'target' : 'immediate';
-            }
-            state.timerActive = !!(flags & 4);
-
-            const EPOCH = 1735689600000; // 2025-01-01 (Shared for both now)
-            state.pauseTime = (isB64 ? fromB64(parts[1]) : parseInt(parts[1], 36)) / 1000 || 0;
-
-            const sRaw = parts[2];
-            if (sRaw) {
-                state.startTime = (isB64 ? fromB64(sRaw) : parseInt(sRaw, 36)) + EPOCH;
-            } else {
-                state.startTime = null;
-            }
-
-            if (parts.length >= 4) {
-                const tsRaw = parts[3];
-                state.actualStartTime = tsRaw === '-' ? state.startTime : (tsRaw ? (isB64 ? fromB64(tsRaw) : parseInt(tsRaw, 36)) + EPOCH : null);
-            }
-
-            if (parts.length >= 5) {
-                const dRaw = parts[4];
-                state.duration = dRaw === '-' ? state.pauseTime : ((isB64 ? fromB64(dRaw) : parseInt(dRaw, 36)) / 1000 || 0);
-            }
-
-            state.timerName = parts[5] ? decodeURIComponent(parts[5]) : '';
-        }
-
-        // Save to localStorage so it's recognized locally
-        const initialState = {
-            ...getSerializableState(),
-            isCreator: false,
-            roomId: id
-        };
-        localStorage.setItem(`timer_state_${id}`, JSON.stringify(initialState));
-
-        // Add to recent list
-        addTimerToList({
-            id: id,
-            type: state.type,
-            name: state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치'),
-            duration: state.duration,
-            createdAt: Date.now()
-        });
-    } else if (state.isStandalone && params.get('t')) {
-        // Fallback for old link format
-        state.type = params.get('t');
-        // ... previous fallback logic remains for compatibility if needed, but I'll skip to keep it clean if user only cares about new short links
-    }
-
-    // Ownership check via sessionStorage (scoped to this room/tab)
-    const ownerToken = sessionStorage.getItem(`timer_owner_${id}`);
-    state.isCreator = ownerToken === tabId;
-
-    showTimer(id);
-
-    if (state.isStandalone) {
-        viewerControls.classList.add('hidden'); // Hide viewer message in standalone
-        syncStatus.title = "Standalone Mode (Not synced)";
-        shareOnlineBtn.classList.add('hidden'); // Hide sync link option in standalone mode
-        shareSubtitle.classList.add('hidden'); // Hide subtitle when only one option exists
-    } else {
-        shareOnlineBtn.classList.remove('hidden');
-        shareSubtitle.classList.remove('hidden');
-        const typeName = state.type === 'countdown' ? '타이머' : '스톱워치';
-        shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
-    }
-
-    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        const timerRef = ref(db, 'timers/' + id);
-        const unsubscribe = onValue(timerRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                state.remoteState = data;
-                syncFromRemote(data);
-                syncStatus.classList.add('online');
-
-                if (state.isStandalone) {
-                    // One-time sync for standalone
-                    unsubscribe();
-                    syncStatus.classList.remove('online');
-                    syncStatus.title = "Standalone Mode (Not synced)";
-                }
-            } else {
-                if (!state.isCreator) {
-                    alert('존재하지 않는 타이머입니다.');
-                    window.location.hash = '';
-                }
-            }
-        });
-    } else {
-        // Local mode fallback via BroadcastChannel
-        console.log(`[Timer] Joining room ${id} in local mode (standalone: ${state.isStandalone})`);
-
-        if (state.bc) state.bc.close();
-        state.bc = new BroadcastChannel('timer_' + id);
-
-        state.bc.onmessage = (event) => {
-            console.log('[Timer] Received BC message:', event.data.msgType);
-            if (event.data.msgType === 'SYNC') {
-                syncFromRemote(event.data.state);
-                syncStatus.classList.add('online');
-                document.getElementById('sync-text').textContent = state.isStandalone ? '개별 모드' : '동기화됨';
-
-                if (state.isStandalone) {
-                    console.log('[Timer] Standalone sync complete, closing channel.');
-                    state.bc.close();
-                    state.bc = null;
-                    syncStatus.classList.remove('online');
-                }
-            } else if (event.data.msgType === 'REQUEST_STATE' && state.isCreator) {
-                console.log('[Timer] Host received REQUEST_STATE, broadcasting...');
-                broadcastSync();
-            }
-        };
-
-        const savedState = localStorage.getItem(`timer_state_${id}`);
-        if (savedState) {
-            console.log('[Timer] Found saved state in localStorage');
-            const data = JSON.parse(savedState);
-            syncFromRemote(data);
-            syncStatus.classList.add('online');
-            document.getElementById('sync-text').textContent = state.isStandalone ? '개별 모드' : '동기화됨';
-            // Even if we have saved state, standalone might want to hear the LATEST from host at least once
-            // So we don't close the channel immediately here. It will be closed after the first sync.
-        }
-
-        if (!state.isCreator) {
-            console.log('[Timer] Requesting state from host...');
-            try {
-                state.bc.postMessage({ msgType: 'REQUEST_STATE' });
-                // Backup request after 1.5 seconds if still nothing
-                setTimeout(() => {
-                    if (document.getElementById('sync-text').textContent.includes('대기')) {
-                        console.log('[Timer] Still waiting for sync, retrying request...');
-                        state.bc.postMessage({ msgType: 'REQUEST_STATE' });
-                    }
-                }, 1500);
-            } catch (e) {
-                console.error('[Timer] Failed to send REQUEST_STATE:', e);
-            }
-        }
-
-        if (!savedState && !state.isStandalone) {
-            syncStatus.classList.remove('online');
-            document.getElementById('sync-text').textContent = '동기화 대기 중...';
-        }
-    }
-}
-
-function syncFromRemote(data) {
-    console.log('[Timer] Syncing from remote data:', data);
-    state.type = data.type;
-    state.countdownMode = data.countdownMode || 'duration';
-    state.timerActive = state.isStandalone ? true : data.active;
-    state.pauseTime = data.pauseTime;
-    state.actualStartTime = data.actualStartTime;
-
-    // If standalone and timer should be active but startTime is null (host was paused)
-    // We set startTime to NOW to start it from the pauseTime.
-    if (state.isStandalone && state.timerActive && !data.startTime) {
-        state.startTime = Date.now();
-    } else {
-        state.startTime = data.startTime;
-    }
-
-    state.duration = data.duration;
-    state.timerName = data.timerName || '';
-
-    typeLabel.textContent = state.type === 'countdown' ? '타이머' : '스톱워치';
-    timerNameDisplay.textContent = state.timerName;
-
-    if (state.isStandalone) {
-        const typeName = state.type === 'countdown' ? '타이머' : '스톱워치';
-        shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
-    }
-
-    if (state.isCreator) {
-        controls.classList.remove('hidden');
-        viewerControls.classList.add('hidden');
-        updateToggleButton();
-    } else if (state.isStandalone) {
-        controls.classList.add('hidden');
-        viewerControls.classList.add('hidden');
-    } else {
-        controls.classList.add('hidden');
-        viewerControls.classList.remove('hidden');
-    }
-}
-
-function updateToggleButton() {
-    const now = Date.now();
-    const isWaiting = state.type === 'stopwatch' && state.startTime && state.startTime > now && state.timerActive;
-
-    // Reset visibility of button children to prevent broken layout
-    resetBtn.classList.remove('hidden');
-    resetBtn.classList.remove('full-width');
-    toggleBtn.classList.remove('hidden');
-    changeTargetBtn.classList.add('hidden');
-
-    if (state.type === 'countdown' && state.countdownMode === 'target') {
-        // Target Timer mode: show Change Target, hide others
-        changeTargetBtn.classList.remove('hidden');
-        resetBtn.classList.add('hidden');
-        toggleBtn.classList.add('hidden');
-    } else if (isWaiting) {
-        // Scheduled stopwatch waiting: hide toggle, make reset full width
-        toggleBtn.classList.add('hidden');
-        resetBtn.classList.add('full-width');
-    } else if (state.timerActive) {
-        toggleBtn.textContent = '일시정지';
-        toggleBtn.style.background = '#e53e3e';
-    } else {
-        // Check if timer has been started before
-        const hasStarted = state.type === 'countdown'
-            ? state.pauseTime < state.duration
-            : (state.pauseTime > 0 || state.actualStartTime !== null);
-
-        toggleBtn.textContent = hasStarted ? '재개' : '시작';
-        toggleBtn.style.background = 'var(--primary-teal)';
-
-        // If countdown finished
-        if (state.type === 'countdown' && state.pauseTime <= 0 && hasStarted) {
-            toggleBtn.classList.add('hidden');
-            resetBtn.classList.add('full-width');
-        }
-    }
-}
-
-async function applyNewTarget() {
-    if (!state.isCreator) return;
-
-    const dateVal = newTargetDate.value;
-    let hourVal = parseInt(newTargetHour.value) || 12;
-    const minuteVal = newTargetMinute.value || '00';
-    const secondVal = newTargetSecond.value || '00';
-    const ampm = newTargetAmpm.value;
+function getTargetTimeFromInputs(dateInput, hourInput, minuteInput, secondInput, ampmInput) {
+    const dateVal = dateInput.value;
+    let hourVal = parseInt(hourInput.value) || 12;
+    const minuteVal = minuteInput.value || '00';
+    const secondVal = secondInput.value || '00';
+    const ampm = ampmInput.value;
 
     if (ampm === 'PM' && hourVal < 12) hourVal += 12;
     if (ampm === 'AM' && hourVal === 12) hourVal = 0;
 
     const targetDate = new Date(`${dateVal}T${hourVal.toString().padStart(2, '0')}:${minuteVal.padStart(2, '0')}:${secondVal.padStart(2, '0')}`);
-    const targetTime = targetDate.getTime();
-    const now = Date.now();
-
-    const newPauseTime = Math.max(0, (targetTime - now) / 1000);
-
-    const updates = {
-        pauseTime: newPauseTime,
-        startTime: now,
-        active: true
-    };
-
-    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        await update(ref(db, 'timers/' + state.roomId), updates);
-    } else {
-        Object.assign(state, updates);
-        state.timerActive = true;
-        updateToggleButton();
-        broadcastSync();
-    }
-
-    changeTargetModal.classList.add('hidden');
+    return targetDate.getTime();
 }
 
-async function toggleTimer() {
-    if (!state.isCreator) return;
-
-    const now = Date.now();
-    const newActive = !state.timerActive;
-    let newPauseTime = state.pauseTime;
-
-    if (!newActive) {
-        // Pausing: calculate new pauseTime
-        const elapsed = (now - (state.startTime || now)) / 1000;
-        if (state.type === 'countdown') {
-            newPauseTime -= elapsed;
-        } else {
-            newPauseTime += elapsed;
-        }
-    }
-
-    const updates = {
-        active: newActive,
-        startTime: newActive ? now : null,
-        pauseTime: newPauseTime
-    };
-
-    if (newActive && state.type === 'stopwatch' && !state.actualStartTime) {
-        updates.actualStartTime = now;
-        state.actualStartTime = now;
-    }
-
-    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        await update(ref(db, 'timers/' + state.roomId), updates);
-    } else {
-        // Update local state for offline demo
-        Object.assign(state, updates);
-        state.timerActive = newActive;
-        updateToggleButton();
-        // Notify other tabs
-        broadcastSync();
-    }
-}
-
-async function resetTimer() {
-    if (!state.isCreator) return;
-
-    const updates = {
-        active: false,
-        startTime: null,
-        actualStartTime: null,
-        pauseTime: state.type === 'countdown' ? state.duration : 0
-    };
-
-    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        await update(ref(db, 'timers/' + state.roomId), updates);
-    } else {
-        Object.assign(state, updates);
-        state.timerActive = false;
-        toggleBtn.classList.remove('hidden'); // Show toggle button again
-        resetBtn.classList.remove('full-width'); // Remove full width from reset button
-        updateToggleButton();
-        // Notify other tabs
-        broadcastSync();
-    }
-}
-
-function copyLink(standalone) {
-    if (!standalone) {
-        const strong = shareOnlineBtn.querySelector('strong');
-        const originalText = strong.textContent;
-        strong.textContent = '개발 중입니다!';
-        shareOnlineBtn.style.opacity = '0.7';
-
-        setTimeout(() => {
-            strong.textContent = originalText;
-            shareOnlineBtn.style.opacity = '1';
-        }, 1500);
+function loadTimer(id) {
+    const savedState = localStorage.getItem(`timer_state_${id}`);
+    if (!savedState) {
+        alert('존재하지 않는 타이머입니다.');
+        window.location.hash = '';
         return;
     }
 
-    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+    const data = JSON.parse(savedState);
+    state.timerId = id;
+    state.type = data.type;
+    state.countdownMode = data.countdownMode || 'duration';
+    state.timerActive = data.active;
+    state.pauseTime = data.pauseTime;
+    state.startTime = data.startTime;
+    state.actualStartTime = data.actualStartTime;
+    state.duration = data.duration;
+    state.timerName = data.timerName || '';
 
-    // Ultra-extreme compression
-    let flags = 0;
-    if (state.type === 'stopwatch') flags |= 1;
-    const mode = state.type === 'countdown' ? state.countdownMode : state.stopwatchMode;
-    if (mode === 'target') flags |= 2;
-    if (state.timerActive) flags |= 4;
-
-    const EPOCH = 1735689600000; // 2025-01-01
-    const p = toB64(Math.floor(state.pauseTime * 1000));
-    const s = state.startTime ? toB64(state.startTime - EPOCH) : '';
-
-    const ts = (state.actualStartTime === state.startTime && state.actualStartTime) ? '-' : (state.actualStartTime ? toB64(state.actualStartTime - EPOCH) : '');
-    const d = (state.duration === state.pauseTime || !state.duration) ? '-' : toB64(Math.floor(state.duration * 1000));
-    const n = encodeURIComponent(state.timerName || '');
-
-    // Payload: [flags],[pause],[start],[actual],[duration],[name]
-    // Trim trailing empty commas
-    const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
-    const url = `${baseUrl}#*${compact}`;
-
-    navigator.clipboard.writeText(url).then(() => {
-        const btn = shareStandaloneBtn;
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<strong>복사되었습니다!</strong>';
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            shareModal.classList.add('hidden');
-        }, 1500);
-    });
+    showTimer();
 }
 
-// Helper to get only serializable data from state (to avoid DataCloneError with DOM elements)
-function getSerializableState() {
-    return {
+function loadFromShareLink(data) {
+    const parts = data.split(',');
+    if (parts.length < 2) {
+        showLanding();
+        return;
+    }
+
+    const flags = fromB64(parts[0]);
+    state.type = (flags & 1) ? 'stopwatch' : 'countdown';
+    state.countdownMode = (flags & 2) ? 'target' : 'duration';
+    state.stopwatchMode = (flags & 2) ? 'target' : 'immediate';
+    state.timerActive = !!(flags & 4);
+
+    const EPOCH = 1735689600000; // 2025-01-01
+    state.pauseTime = fromB64(parts[1]) / 1000 || 0;
+
+    if (parts[2]) {
+        state.startTime = fromB64(parts[2]) + EPOCH;
+    } else {
+        state.startTime = null;
+    }
+
+    if (parts.length >= 4 && parts[3]) {
+        state.actualStartTime = parts[3] === '-' ? state.startTime : fromB64(parts[3]) + EPOCH;
+    }
+
+    if (parts.length >= 5 && parts[4]) {
+        state.duration = parts[4] === '-' ? state.pauseTime : fromB64(parts[4]) / 1000;
+    }
+
+    state.timerName = parts[5] ? decodeURIComponent(parts[5]) : '';
+    state.timerId = 'shared_' + generateShortId(4);
+
+    // For shared links, always keep timer active
+    if (state.timerActive && !state.startTime) {
+        state.startTime = Date.now();
+    }
+
+    saveTimerState(state.timerId);
+    showTimer();
+}
+
+function saveTimerState(id) {
+    const timerState = {
         type: state.type,
         active: state.timerActive,
         startTime: state.startTime,
@@ -939,6 +451,133 @@ function getSerializableState() {
         actualStartTime: state.actualStartTime,
         timerName: state.timerName
     };
+    localStorage.setItem(`timer_state_${id}`, JSON.stringify(timerState));
+}
+
+function updateToggleButton() {
+    const now = Date.now();
+    const isWaiting = state.type === 'stopwatch' && state.startTime && state.startTime > now && state.timerActive;
+
+    resetBtn.classList.remove('hidden', 'full-width');
+    toggleBtn.classList.remove('hidden');
+    changeTargetBtn.classList.add('hidden');
+
+    if (state.type === 'countdown' && state.countdownMode === 'target') {
+        changeTargetBtn.classList.remove('hidden');
+        resetBtn.classList.add('hidden');
+        toggleBtn.classList.add('hidden');
+    } else if (isWaiting) {
+        toggleBtn.classList.add('hidden');
+        resetBtn.classList.add('full-width');
+    } else if (state.timerActive) {
+        toggleBtn.textContent = '일시정지';
+        toggleBtn.style.background = '#e53e3e';
+    } else {
+        const hasStarted = state.type === 'countdown'
+            ? state.pauseTime < state.duration
+            : (state.pauseTime > 0 || state.actualStartTime !== null);
+
+        toggleBtn.textContent = hasStarted ? '재개' : '시작';
+        toggleBtn.style.background = 'var(--primary-teal)';
+
+        if (state.type === 'countdown' && state.pauseTime <= 0 && hasStarted) {
+            toggleBtn.classList.add('hidden');
+            resetBtn.classList.add('full-width');
+        }
+    }
+}
+
+function openChangeTargetModal() {
+    if (state.startTime && state.pauseTime) {
+        const endPoint = new Date(state.startTime + state.pauseTime * 1000);
+        newTargetDate.value = endPoint.toISOString().split('T')[0];
+        let hours = endPoint.getHours();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        newTargetAmpm.value = ampm;
+        newTargetHour.value = hours;
+        newTargetMinute.value = endPoint.getMinutes().toString().padStart(2, '0');
+        newTargetSecond.value = endPoint.getSeconds().toString().padStart(2, '0');
+    }
+    changeTargetModal.classList.remove('hidden');
+}
+
+function applyNewTarget() {
+    const targetTime = getTargetTimeFromInputs(newTargetDate, newTargetHour, newTargetMinute, newTargetSecond, newTargetAmpm);
+    const now = Date.now();
+
+    state.pauseTime = Math.max(0, (targetTime - now) / 1000);
+    state.startTime = now;
+    state.timerActive = true;
+
+    saveTimerState(state.timerId);
+    updateToggleButton();
+    changeTargetModal.classList.add('hidden');
+}
+
+function toggleTimer() {
+    const now = Date.now();
+    const newActive = !state.timerActive;
+
+    if (!newActive) {
+        const elapsed = (now - (state.startTime || now)) / 1000;
+        if (state.type === 'countdown') {
+            state.pauseTime -= elapsed;
+        } else {
+            state.pauseTime += elapsed;
+        }
+    }
+
+    state.timerActive = newActive;
+    state.startTime = newActive ? now : null;
+
+    if (newActive && state.type === 'stopwatch' && !state.actualStartTime) {
+        state.actualStartTime = now;
+    }
+
+    saveTimerState(state.timerId);
+    updateToggleButton();
+}
+
+function resetTimer() {
+    state.timerActive = false;
+    state.startTime = null;
+    state.actualStartTime = null;
+    state.pauseTime = state.type === 'countdown' ? state.duration : 0;
+
+    toggleBtn.classList.remove('hidden');
+    resetBtn.classList.remove('full-width');
+
+    saveTimerState(state.timerId);
+    updateToggleButton();
+}
+
+function copyShareLink() {
+    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+
+    let flags = 0;
+    if (state.type === 'stopwatch') flags |= 1;
+    const mode = state.type === 'countdown' ? state.countdownMode : state.stopwatchMode;
+    if (mode === 'target') flags |= 2;
+    if (state.timerActive) flags |= 4;
+
+    const EPOCH = 1735689600000;
+    const p = toB64(Math.floor(state.pauseTime * 1000));
+    const s = state.startTime ? toB64(state.startTime - EPOCH) : '';
+    const ts = (state.actualStartTime === state.startTime && state.actualStartTime) ? '-' : (state.actualStartTime ? toB64(state.actualStartTime - EPOCH) : '');
+    const d = (state.duration === state.pauseTime || !state.duration) ? '-' : toB64(Math.floor(state.duration * 1000));
+    const n = encodeURIComponent(state.timerName || '');
+
+    const compact = `${toB64(flags)},${p},${s},${ts},${d},${n}`.replace(/,+$/, '');
+    const url = `${baseUrl}#*${compact}`;
+
+    navigator.clipboard.writeText(url).then(() => {
+        const originalText = shareBtn.textContent;
+        shareBtn.textContent = '복사됨!';
+        setTimeout(() => {
+            shareBtn.textContent = originalText;
+        }, 1500);
+    });
 }
 
 function startTicker() {
@@ -965,9 +604,7 @@ function updateDisplay() {
             displaySeconds = state.pauseTime - elapsed;
             if (displaySeconds <= 0) {
                 displaySeconds = 0;
-                if (state.isCreator) {
-                    stopTimerAtZero();
-                }
+                stopTimerAtZero();
             }
         } else {
             if (elapsed < 0) {
@@ -979,57 +616,53 @@ function updateDisplay() {
         }
     }
 
-    // Update Timer Info Message
-    if (state.view === 'timer') {
-        if (state.type === 'stopwatch') {
-            timerInfo.classList.remove('hidden');
-            if (state.actualStartTime) {
-                const startPoint = new Date(state.actualStartTime);
+    updateTimerInfo(isWaiting);
 
-                // Always include date for stopwatch
-                let detailStr = (startPoint.getMonth() + 1).toString().padStart(2, '0') + '/' +
-                    startPoint.getDate().toString().padStart(2, '0') + ' ';
-                detailStr += startPoint.toLocaleTimeString('ko-KR', { hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' });
-
-                if (isWaiting) {
-                    timerInfo.textContent = `⏱️ 스톱워치 시작 대기 중... (${detailStr} 시작)`;
-                    timerInfo.className = 'timer-info waiting';
-                } else {
-                    timerInfo.textContent = `시작 시간: ${detailStr}`;
-                    timerInfo.className = 'timer-info';
-                }
-            } else {
-                timerInfo.textContent = '';
-                timerInfo.classList.add('hidden');
-            }
-        } else {
-            // Countdown mode info
-            const showInfo = (state.timerActive && state.startTime) || (state.countdownMode === 'target');
-            if (showInfo && state.startTime) {
-                timerInfo.classList.remove('hidden');
-
-                // End time calculation: startTime + pauseTime * 1000
-                const endPoint = new Date(state.startTime + state.pauseTime * 1000);
-
-                let detailStr = (endPoint.getMonth() + 1).toString().padStart(2, '0') + '/' +
-                    endPoint.getDate().toString().padStart(2, '0') + ' ';
-                detailStr += endPoint.toLocaleTimeString('ko-KR', { hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' });
-
-                timerInfo.textContent = `종료 예정 시간: ${detailStr}`;
-                timerInfo.className = 'timer-info';
-            } else {
-                timerInfo.textContent = '';
-                timerInfo.classList.add('hidden');
-            }
-        }
-    }
-
-    // Check if we need to update buttons (e.g. waiting finished)
-    if (state.isCreator && (state.lastIsWaiting !== isWaiting)) {
+    if (state.lastIsWaiting !== isWaiting) {
         state.lastIsWaiting = isWaiting;
         updateToggleButton();
     }
 
+    renderTime(displaySeconds);
+}
+
+function updateTimerInfo(isWaiting) {
+    if (state.type === 'stopwatch') {
+        if (state.actualStartTime) {
+            timerInfo.classList.remove('hidden');
+            const startPoint = new Date(state.actualStartTime);
+            let detailStr = formatDateTime(startPoint);
+
+            if (isWaiting) {
+                timerInfo.textContent = `⏱️ 스톱워치 시작 대기 중... (${detailStr} 시작)`;
+                timerInfo.className = 'timer-info waiting';
+            } else {
+                timerInfo.textContent = `시작 시간: ${detailStr}`;
+                timerInfo.className = 'timer-info';
+            }
+        } else {
+            timerInfo.classList.add('hidden');
+        }
+    } else {
+        const showInfo = (state.timerActive && state.startTime) || (state.countdownMode === 'target');
+        if (showInfo && state.startTime) {
+            timerInfo.classList.remove('hidden');
+            const endPoint = new Date(state.startTime + state.pauseTime * 1000);
+            timerInfo.textContent = `종료 예정 시간: ${formatDateTime(endPoint)}`;
+            timerInfo.className = 'timer-info';
+        } else {
+            timerInfo.classList.add('hidden');
+        }
+    }
+}
+
+function formatDateTime(date) {
+    return (date.getMonth() + 1).toString().padStart(2, '0') + '/' +
+        date.getDate().toString().padStart(2, '0') + ' ' +
+        date.toLocaleTimeString('ko-KR', { hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' });
+}
+
+function renderTime(displaySeconds) {
     const totalSeconds = Math.abs(state.type === 'stopwatch' ? Math.floor(displaySeconds) : Math.round(displaySeconds));
     const d = Math.floor(totalSeconds / 86400);
     const h = Math.floor((totalSeconds % 86400) / 3600);
@@ -1058,127 +691,57 @@ function stopTimerAtZero() {
     state.timerActive = false;
     state.pauseTime = 0;
     state.startTime = null;
+    saveTimerState(state.timerId);
     updateToggleButton();
-
-    // Play alarm sound
     playAlarmSound();
-
-    // Show browser notification
     showTimerNotification();
-
-    broadcastSync();
 }
 
 function playAlarmSound() {
-    // Create an AudioContext and generate a beep sound
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    const createBeep = () => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.frequency.value = 800;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.5);
+    };
 
-    oscillator.frequency.value = 800; // Frequency in Hz
-    oscillator.type = 'sine';
-
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.5);
-
-    // Play 3 beeps
-    setTimeout(() => {
-        const osc2 = audioContext.createOscillator();
-        const gain2 = audioContext.createGain();
-        osc2.connect(gain2);
-        gain2.connect(audioContext.destination);
-        osc2.frequency.value = 800;
-        osc2.type = 'sine';
-        gain2.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        osc2.start();
-        osc2.stop(audioContext.currentTime + 0.5);
-    }, 600);
-
-    setTimeout(() => {
-        const osc3 = audioContext.createOscillator();
-        const gain3 = audioContext.createGain();
-        osc3.connect(gain3);
-        gain3.connect(audioContext.destination);
-        osc3.frequency.value = 800;
-        osc3.type = 'sine';
-        gain3.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        osc3.start();
-        osc3.stop(audioContext.currentTime + 0.5);
-    }, 1200);
+    createBeep();
+    setTimeout(createBeep, 600);
+    setTimeout(createBeep, 1200);
 }
 
 function showTimerNotification() {
-    // Request notification permission if not granted
     if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-            const timerName = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
+        const notify = () => {
+            const timerName = state.timerName || '타이머';
             new Notification('타이머 종료!', {
-                body: `${timerName}이(가) 종료되었습니다.`,
-                icon: '/favicon.ico',
-                badge: '/favicon.ico'
+                body: `${timerName}이(가) 종료되었습니다.`
             });
+        };
+
+        if (Notification.permission === 'granted') {
+            notify();
         } else if (Notification.permission !== 'denied') {
             Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
-                    const timerName = state.timerName || (state.type === 'countdown' ? '타이머' : '스톱워치');
-                    new Notification('타이머 종료!', {
-                        body: `${timerName}이(가) 종료되었습니다.`,
-                        icon: '/favicon.ico',
-                        badge: '/favicon.ico'
-                    });
-                }
+                if (permission === 'granted') notify();
             });
         }
     }
 }
 
-function broadcastSync() {
-    if (db && firebaseConfig.apiKey !== "DEMO_KEY") {
-        update(ref(db, 'timers/' + state.roomId), {
-            type: state.type,
-            active: state.timerActive,
-            pauseTime: state.pauseTime,
-            startTime: state.startTime,
-            actualStartTime: state.actualStartTime,
-            duration: state.duration,
-            timerName: state.timerName
-        });
-    } else {
-        // Save state to localStorage for persistence regardless of role
-        if (state.roomId) {
-            // Only save if we have valid data (e.g. Creator). Values might be null if we are just a viewer who hasn't synced yet.
-            // But broadcastSync is usually called by creator or after sync.
-            // Check if we are creator or standalone-master to avoid overwriting with empty state? 
-            // Actually broadcastSync is called when WE change something.
-            localStorage.setItem(`timer_state_${state.roomId}`, JSON.stringify(getSerializableState()));
-        }
-
-        if (!state.bc) {
-            state.bc = new BroadcastChannel('timer_' + state.roomId);
-        }
-        console.log('[Timer] Broadcasting state via BC:', getSerializableState());
-        try {
-            state.bc.postMessage({ msgType: 'SYNC', state: getSerializableState() });
-        } catch (e) {
-            console.error('[Timer] Failed to post SYNC message:', e);
-        }
-    }
-}
-
-// Timer List Management Functions
+// Timer List Functions
 function loadTimerList() {
     const savedList = localStorage.getItem('timerList');
     if (savedList) {
-        const timers = JSON.parse(savedList);
-        renderTimerList(timers);
+        renderTimerList(JSON.parse(savedList));
     }
 }
 
@@ -1186,12 +749,11 @@ function addTimerToList(timer) {
     const savedList = localStorage.getItem('timerList');
     const timers = savedList ? JSON.parse(savedList) : [];
 
-    // Check if timer already exists
     const existingIndex = timers.findIndex(t => t.id === timer.id);
     if (existingIndex >= 0) {
         timers[existingIndex] = timer;
     } else {
-        timers.unshift(timer); // Add to beginning
+        timers.unshift(timer);
     }
 
     localStorage.setItem('timerList', JSON.stringify(timers));
@@ -1202,14 +764,12 @@ function removeTimerFromList(timerId) {
     const savedList = localStorage.getItem('timerList');
     if (!savedList) return;
 
-    const timers = JSON.parse(savedList);
-    const filtered = timers.filter(t => t.id !== timerId);
-
-    localStorage.setItem('timerList', JSON.stringify(filtered));
-    renderTimerList(filtered);
+    const timers = JSON.parse(savedList).filter(t => t.id !== timerId);
+    localStorage.setItem('timerList', JSON.stringify(timers));
+    localStorage.removeItem(`timer_state_${timerId}`);
+    renderTimerList(timers);
 }
 
-// Redefined renderTimerList
 function renderTimerList(timers) {
     if (!timers || timers.length === 0) {
         timerListSection.classList.add('hidden');
@@ -1218,98 +778,14 @@ function renderTimerList(timers) {
     }
 
     timerListSection.classList.remove('hidden');
-    timerListContainer.innerHTML = timers.map(timer => createTimerListItem(timer)).join('');
-
-    // Attach event listeners
-    timers.forEach(timer => {
-        const itemEl = document.getElementById(`timer-item-${timer.id}`);
-        if (!itemEl) return;
-
-        // Click to navigate
-        const infoEl = itemEl.querySelector('.timer-list-info');
-        if (infoEl) {
-            infoEl.addEventListener('click', () => {
-                window.location.hash = `/${timer.id}`;
-            });
-            infoEl.style.cursor = 'pointer';
-        }
-
-        // Delete button (2-step confirmation)
-        const deleteBtn = itemEl.querySelector('.delete-timer-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-
-                if (deleteBtn.classList.contains('confirming')) {
-                    // Second click: Delete
-                    removeTimerFromList(timer.id);
-                } else {
-                    // First click: Request confirmation
-                    deleteBtn.classList.add('confirming');
-                    const originalHTML = deleteBtn.innerHTML;
-
-                    // Change icon to Red Checkbox (using SVG)
-                    deleteBtn.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#e53e3e" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                            <polyline points="9 11 12 14 22 4"/>
-                        </svg>
-                    `;
-                    deleteBtn.style.color = '#e53e3e';
-                    deleteBtn.style.background = '#fff5f5';
-
-                    // Reset after 3 seconds if not clicked
-                    setTimeout(() => {
-                        if (document.body.contains(deleteBtn) && deleteBtn.classList.contains('confirming')) {
-                            deleteBtn.classList.remove('confirming');
-                            deleteBtn.innerHTML = originalHTML;
-                            deleteBtn.style.color = '';
-                            deleteBtn.style.background = '';
-                        }
-                    }, 3000);
-                }
-            });
-        }
-
-        // Share button (Open Modal)
-        const shareBtn = itemEl.querySelector('.share-timer-btn');
-        if (shareBtn) {
-            shareBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // Set the roomId for the modal to use
-                state.roomId = timer.id;
-
-                // Update modal labels based on type
-                const typeName = timer.type === 'countdown' ? '타이머' : '스톱워치';
-                shareStandaloneLabel.textContent = `${typeName} 링크 복사`;
-
-                // Show modal
-                shareModal.classList.remove('hidden');
-            });
-        }
-    });
-
-    // Initial update for display
-    updateTimerListDisplay();
-}
-
-function createTimerListItem(timer) {
-    const typeLabel = timer.type === 'countdown' ? '타이머' : '스톱워치';
-
-    return `
+    timerListContainer.innerHTML = timers.map(timer => `
         <div id="timer-item-${timer.id}" class="timer-list-item" data-id="${timer.id}">
             <div class="timer-list-info">
                 <div class="timer-list-name">${timer.name}</div>
                 <div class="timer-list-time" id="timer-time-${timer.id}">--:--:--</div>
-                <div class="timer-list-type" id="timer-type-${timer.id}">${typeLabel}</div>
+                <div class="timer-list-type" id="timer-type-${timer.id}">${timer.type === 'countdown' ? '타이머' : '스톱워치'}</div>
             </div>
             <div class="timer-list-actions">
-                <button class="timer-list-btn share-timer-btn" title="링크 공유">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                    </svg>
-                </button>
                 <button class="timer-list-btn delete-timer-btn delete" title="삭제">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"/>
@@ -1320,7 +796,41 @@ function createTimerListItem(timer) {
                 </button>
             </div>
         </div>
-    `;
+    `).join('');
+
+    timers.forEach(timer => {
+        const itemEl = document.getElementById(`timer-item-${timer.id}`);
+        if (!itemEl) return;
+
+        const infoEl = itemEl.querySelector('.timer-list-info');
+        if (infoEl) {
+            infoEl.addEventListener('click', () => window.location.hash = `/${timer.id}`);
+            infoEl.style.cursor = 'pointer';
+        }
+
+        const deleteBtn = itemEl.querySelector('.delete-timer-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (deleteBtn.classList.contains('confirming')) {
+                    removeTimerFromList(timer.id);
+                } else {
+                    deleteBtn.classList.add('confirming');
+                    deleteBtn.style.background = '#fff5f5';
+                    deleteBtn.style.color = '#e53e3e';
+                    setTimeout(() => {
+                        if (deleteBtn.classList.contains('confirming')) {
+                            deleteBtn.classList.remove('confirming');
+                            deleteBtn.style.background = '';
+                            deleteBtn.style.color = '';
+                        }
+                    }, 3000);
+                }
+            });
+        }
+    });
+
+    updateTimerListDisplay();
 }
 
 function formatDateShort(date) {
@@ -1338,149 +848,90 @@ function updateTimerListDisplay() {
     const savedList = localStorage.getItem('timerList');
     if (!savedList) return;
 
-    const timers = JSON.parse(savedList);
-    timers.forEach(timer => {
+    JSON.parse(savedList).forEach(timer => {
         const itemEl = document.getElementById(`timer-item-${timer.id}`);
         if (!itemEl) return;
 
         const timeEl = document.getElementById(`timer-time-${timer.id}`);
         const typeLabelEl = document.getElementById(`timer-type-${timer.id}`);
-
-        // Load latest state
         const savedState = localStorage.getItem(`timer_state_${timer.id}`);
+
         if (savedState) {
             const timerState = JSON.parse(savedState);
             const now = Date.now();
-            let displayTime = '';
-            let isActive = timerState.active;
-            let extraInfo = '';
+            let displaySeconds, isActive = timerState.active, extraInfo = '';
 
-            // Calculate time based on type
             if (timerState.type === 'countdown') {
-                let remaining = timerState.pauseTime;
-
+                displaySeconds = timerState.pauseTime;
                 if (isActive && timerState.startTime) {
-                    const elapsed = (now - timerState.startTime) / 1000;
-                    remaining = timerState.pauseTime - elapsed;
-
-                    // Countdown End Time
-                    const endTime = new Date(timerState.startTime + timerState.pauseTime * 1000);
-                    extraInfo = ` • 종료 예정: ${formatDateShort(endTime)}`;
+                    displaySeconds = timerState.pauseTime - (now - timerState.startTime) / 1000;
+                    extraInfo = ` • 종료 예정: ${formatDateShort(new Date(timerState.startTime + timerState.pauseTime * 1000))}`;
                 }
-
-                if (remaining <= 0) {
-                    remaining = 0;
+                if (displaySeconds <= 0) {
+                    displaySeconds = 0;
                     isActive = false;
                     itemEl.classList.add('finished');
                     extraInfo = ' • 종료됨';
                 } else {
                     itemEl.classList.remove('finished');
                 }
-
-                // Format D일 HH:MM:SS
-                const absSeconds = Math.abs(Math.round(remaining));
-                const d = Math.floor(absSeconds / 86400);
-                const hours = Math.floor((absSeconds % 86400) / 3600);
-                const minutes = Math.floor((absSeconds % 3600) / 60);
-                const seconds = absSeconds % 60;
-
-                displayTime = d > 0 ? `${d}일 ` : '';
-                displayTime += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
             } else {
-                // Stopwatch
-                let elapsedSeconds = timerState.pauseTime;
-
+                displaySeconds = timerState.pauseTime;
                 if (isActive && timerState.startTime) {
-                    elapsedSeconds = timerState.pauseTime + (now - timerState.startTime) / 1000;
+                    displaySeconds = timerState.pauseTime + (now - timerState.startTime) / 1000;
                 }
-
-                // Stopwatch Start Time
                 if (timerState.actualStartTime) {
-                    const startTime = new Date(timerState.actualStartTime);
-                    extraInfo = ` • 시작: ${formatDateShort(startTime)}`;
+                    extraInfo = ` • 시작: ${formatDateShort(new Date(timerState.actualStartTime))}`;
                 }
-
                 itemEl.classList.remove('finished');
-
-                // Format D일 HH:MM:SS
-                const absSeconds = Math.abs(Math.round(elapsedSeconds));
-                const d = Math.floor(absSeconds / 86400);
-                const hours = Math.floor((absSeconds % 86400) / 3600);
-                const minutes = Math.floor((absSeconds % 3600) / 60);
-                const seconds = absSeconds % 60;
-
-                displayTime = d > 0 ? `${d}일 ` : '';
-                displayTime += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
 
-            // Add status indicator text
-            let statusText = '';
-            if (isActive) statusText = ' (진행 중)';
-            else if (timerState.type === 'countdown' && parseInt(displayTime.replace(/:/g, '')) === 0) statusText = ' (종료)';
-            else statusText = ' (일시정지)';
+            const absSeconds = Math.abs(Math.round(displaySeconds));
+            const d = Math.floor(absSeconds / 86400);
+            const hours = Math.floor((absSeconds % 86400) / 3600);
+            const minutes = Math.floor((absSeconds % 3600) / 60);
+            const seconds = absSeconds % 60;
 
+            let displayTime = d > 0 ? `${d}일 ` : '';
+            displayTime += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            const statusText = isActive ? ' (진행 중)' : (displaySeconds <= 0 ? ' (종료)' : ' (일시정지)');
             timeEl.textContent = displayTime + statusText;
-
-            // Update type label with extra info
-            let typeText = timerState.type === 'countdown' ? '타이머' : '스톱워치';
-            if (typeLabelEl) {
-                typeLabelEl.textContent = typeText + extraInfo;
-            }
-
-            // Update name if changed
-            if (timerState.timerName && timerState.timerName !== timer.name) {
-                const nameEl = itemEl.querySelector('.timer-list-name');
-                if (nameEl) nameEl.textContent = timerState.timerName;
-            }
+            typeLabelEl.textContent = (timerState.type === 'countdown' ? '타이머' : '스톱워치') + extraInfo;
         }
     });
 }
 
-// Theme Logic
+// Theme
 function initTheme() {
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 
-    // 1. Initial Apply: Saved preference has first priority for refresh persistence
     if (savedTheme) {
         document.body.classList.toggle('dark-mode', savedTheme === 'dark');
     } else {
-        // Fallback to system if no manual preference yet
         document.body.classList.toggle('dark-mode', systemPrefersDark.matches);
     }
 
     updateThemeUI();
 
-    // 2. Listen for system theme changes (e.g. OS toggled while app is open)
     systemPrefersDark.addEventListener('change', (e) => {
-        // ALWAYS follow system changes when they happen
-        const isDark = e.matches;
-        document.body.classList.toggle('dark-mode', isDark);
-        // Update storage so refresh follows this new state
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        document.body.classList.toggle('dark-mode', e.matches);
+        localStorage.setItem('theme', e.matches ? 'dark' : 'light');
         updateThemeUI();
     });
 
-    themeToggle.addEventListener('click', toggleTheme);
-}
-
-function toggleTheme() {
-    const isDark = document.body.classList.toggle('dark-mode');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    updateThemeUI();
+    themeToggle.addEventListener('click', () => {
+        const isDark = document.body.classList.toggle('dark-mode');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        updateThemeUI();
+    });
 }
 
 function updateThemeUI() {
     const isDark = document.body.classList.contains('dark-mode');
-    if (isDark) {
-        sunIcon.classList.remove('hidden');
-        moonIcon.classList.add('hidden');
-    } else {
-        sunIcon.classList.add('hidden');
-        moonIcon.classList.remove('hidden');
-    }
+    sunIcon.classList.toggle('hidden', !isDark);
+    moonIcon.classList.toggle('hidden', isDark);
 }
 
-console.log('=== OnlineTimer App Script Loaded ===');
 init();

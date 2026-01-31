@@ -34,10 +34,6 @@ body.dark-mode {
     --accent-red-text: #fc8181;
 }
 
-body {
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
-
 * {
     box-sizing: border-box;
     margin: 0;
@@ -53,6 +49,7 @@ body {
     align-items: flex-start;
     min-height: 100vh;
     overflow-y: auto;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #app {
@@ -73,7 +70,6 @@ body {
     animation: fadeIn 0.3s ease-out;
     width: 100%;
     max-width: 500px;
-    /* Bring back to a reasonable card-like width */
     margin: 40px auto;
 }
 
@@ -180,7 +176,6 @@ select {
     text-align: center;
 }
 
-/* Remove spin buttons for better centering */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -294,10 +289,8 @@ select:focus {
     align-items: center;
     width: 100%;
     max-width: 500px;
-    /* Bring icons closer together */
     margin: 0 auto;
     padding: 32px 0 12px 0;
-    /* Increase top padding for better breathing room */
     flex-shrink: 0;
 }
 
@@ -305,16 +298,6 @@ select:focus {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-#room-id-display {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--primary-teal);
-    background: #e6fffa;
-    padding: 4px 10px;
-    border-radius: 20px;
-    border: 1px solid #b2f5ea;
 }
 
 .timer-container {
@@ -339,7 +322,6 @@ select:focus {
 
 .timer-display {
     font-size: clamp(2rem, 13vw, 15rem);
-    /* Adjust scaling for safety */
     font-weight: 900;
     font-variant-numeric: tabular-nums;
     color: var(--primary-teal);
@@ -366,7 +348,6 @@ select:focus {
 
 .timer-day-label {
     font-size: clamp(1.5rem, 6vw, 2.5rem);
-    /* Same as .timer-ms */
     color: var(--primary-teal);
     margin-left: 4px;
     margin-right: 8px;
@@ -379,7 +360,6 @@ select:focus {
     letter-spacing: 1px;
     color: var(--text-secondary);
     margin-top: 16px;
-    /* Add gap between numbers and label */
 }
 
 .controls {
@@ -390,7 +370,6 @@ select:focus {
     width: auto;
     min-width: 0;
     margin: 40px auto 20px auto;
-    /* Gap above buttons, push from label */
     flex-shrink: 0;
     z-index: 10;
 }
@@ -404,7 +383,6 @@ select:focus {
     border: none;
     transition: var(--transition);
     white-space: nowrap;
-    /* Prevent button text from wrapping */
 }
 
 .control-btn.full-width {
@@ -421,38 +399,16 @@ select:focus {
     color: var(--text-main);
 }
 
-.viewer-message {
-    text-align: center;
-    padding: 16px;
-    background: #ebf8f8;
-    border-radius: 8px;
-    color: var(--primary-teal);
-    font-size: 0.9rem;
-}
-
 .timer-info {
     text-align: center;
     font-size: 0.85rem;
     color: var(--text-secondary);
-    margin: auto auto 12px auto;
-    /* margin-top: auto pushes this and indicator to bottom */
+    margin: auto auto 24px auto;
     min-height: 1.2rem;
     padding: 8px 16px;
     border-radius: 6px;
     background: var(--info-bg);
     width: fit-content;
-}
-
-.status-indicator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    margin-top: auto;
-    /* Push to the very bottom */
-    padding-bottom: 24px;
-    flex-shrink: 0;
 }
 
 .timer-info.waiting {
@@ -463,40 +419,15 @@ select:focus {
 }
 
 @keyframes pulse {
-    0% {
+
+    0%,
+    100% {
         opacity: 0.7;
     }
 
     50% {
         opacity: 1;
     }
-
-    100% {
-        opacity: 0.7;
-    }
-}
-
-.status-indicator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #cbd5e0;
-}
-
-.status-dot.online {
-    background: #48bb78;
-}
-
-#sync-text {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
 }
 
 .hidden {
@@ -544,64 +475,10 @@ select:focus {
     background: var(--bg-white);
 }
 
-.share-options {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.share-option-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--bg-white);
-    cursor: pointer;
-    text-align: left;
-    transition: var(--transition);
-    color: var(--text-main);
-}
-
-.share-option-card:hover {
-    border-color: var(--primary-teal);
-    background: var(--info-bg);
-    transform: translateY(-2px);
-}
-
-.share-option-card .icon {
-    font-size: 1.5rem;
-    background: var(--info-bg);
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    flex-shrink: 0;
-    /* Prevent icon from squashing */
-}
-
-.share-option-card .details {
-    display: flex;
-    flex-direction: column;
-}
-
-.share-option-card strong {
-    font-size: 0.95rem;
-}
-
-.share-option-card span {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-}
-
 /* Timer List Section Styles */
 .timer-list-section {
     margin: 32px 0;
     width: 100%;
-    /* Fill the parent view width */
 }
 
 .timer-list-section h2 {
@@ -663,10 +540,6 @@ select:focus {
     color: var(--primary-teal);
     font-variant-numeric: tabular-nums;
     margin-bottom: 4px;
-}
-
-.timer-list-item.finished .timer-list-time {
-    color: #e53e3e;
 }
 
 .timer-list-type {
