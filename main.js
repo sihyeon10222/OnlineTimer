@@ -679,21 +679,17 @@ function formatDateTime(date) {
 }
 
 function renderTime(displaySeconds) {
+    const total = Math.abs(displaySeconds);
+    const ms = Math.floor((total % 1) * 100);
+
     if (state.showSeconds) {
-        let formatted = '';
-        if (state.type === 'stopwatch') {
-            const total = Math.abs(displaySeconds);
-            const s = Math.floor(total);
-            const ms = Math.floor((total % 1) * 100);
-            formatted = `${s}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
-        } else {
-            formatted = Math.round(Math.abs(displaySeconds)).toString();
-        }
+        const s = Math.floor(total);
+        const formatted = `${s}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
         timerDisplay.innerHTML = `${formatted}<span class="timer-day-label">초</span>`;
         return;
     }
 
-    const totalSeconds = Math.abs(state.type === 'stopwatch' ? Math.floor(displaySeconds) : Math.round(displaySeconds));
+    const totalSeconds = Math.floor(total);
     const d = Math.floor(totalSeconds / 86400);
     const h = Math.floor((totalSeconds % 86400) / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
@@ -709,12 +705,7 @@ function renderTime(displaySeconds) {
         s.toString().padStart(2, '0')
     ].join(':');
 
-    if (state.type === 'stopwatch') {
-        const ms = Math.floor((Math.abs(displaySeconds) % 1) * 100);
-        timerDisplay.innerHTML = `${formatted}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
-    } else {
-        timerDisplay.innerHTML = formatted;
-    }
+    timerDisplay.innerHTML = `${formatted}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
 }
 
 function stopTimerAtZero() {
