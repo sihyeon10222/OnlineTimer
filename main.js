@@ -42,7 +42,7 @@ const state = {
     actualStartTime: null,
     timerName: '',
     lastIsWaiting: false,
-    showSeconds: false
+    displayMode: 'normal'
 };
 
 // UI Elements
@@ -87,7 +87,9 @@ const swTargetSecondInput = document.getElementById('sw-target-second');
 const timerInfo = document.getElementById('timer-info');
 const timerNameInput = document.getElementById('timer-name-input');
 const timerNameDisplay = document.getElementById('timer-name-display');
-const secondsToggleBtn = document.getElementById('seconds-toggle-btn');
+const modeNormalBtn = document.getElementById('mode-normal-btn');
+const modeMinutesBtn = document.getElementById('mode-minutes-btn');
+const modeSecondsBtn = document.getElementById('mode-seconds-btn');
 
 // Timer List Elements
 const timerListSection = document.getElementById('timer-list-section');
@@ -155,7 +157,9 @@ function setupListeners() {
     toggleBtn.addEventListener('click', toggleTimer);
     resetBtn.addEventListener('click', resetTimer);
     shareBtn.addEventListener('click', copyShareLink);
-    secondsToggleBtn.addEventListener('click', toggleSecondsView);
+    modeNormalBtn.addEventListener('click', () => setDisplayMode('normal'));
+    modeMinutesBtn.addEventListener('click', () => setDisplayMode('minutes'));
+    modeSecondsBtn.addEventListener('click', () => setDisplayMode('seconds'));
 
     swModeImmediate.addEventListener('click', () => setStopwatchMode('immediate'));
     swModeTarget.addEventListener('click', () => setStopwatchMode('target'));
@@ -232,10 +236,14 @@ function setupListeners() {
     enforceRange(newTargetSecond, 0, 59);
 }
 
-function toggleSecondsView() {
-    state.showSeconds = !state.showSeconds;
-    secondsToggleBtn.classList.toggle('active', state.showSeconds);
-    secondsToggleBtn.textContent = state.showSeconds ? '일반 보기' : '초로 보기';
+function setDisplayMode(mode) {
+    state.displayMode = mode;
+
+    // Update active UI
+    modeNormalBtn.classList.toggle('active', mode === 'normal');
+    modeMinutesBtn.classList.toggle('active', mode === 'minutes');
+    modeSecondsBtn.classList.toggle('active', mode === 'seconds');
+
     saveTimerState(state.timerId);
     updateDisplay();
 }
@@ -405,10 +413,9 @@ function loadTimer(id) {
     state.actualStartTime = data.actualStartTime;
     state.duration = data.duration;
     state.timerName = data.timerName || '';
-    state.showSeconds = data.showSeconds || false;
+    state.displayMode = data.displayMode || 'normal';
 
-    secondsToggleBtn.classList.toggle('active', state.showSeconds);
-    secondsToggleBtn.textContent = state.showSeconds ? '일반 보기' : '초로 보기';
+    setDisplayMode(state.displayMode);
 
     showTimer();
 }
@@ -465,7 +472,7 @@ function saveTimerState(id) {
         countdownMode: state.countdownMode,
         actualStartTime: state.actualStartTime,
         timerName: state.timerName,
-        showSeconds: state.showSeconds
+        displayMode: state.displayMode
     };
     localStorage.setItem(`timer_state_${id}`, JSON.stringify(timerState));
 }
@@ -681,14 +688,23 @@ function formatDateTime(date) {
 function renderTime(displaySeconds) {
     const total = Math.abs(displaySeconds);
     const ms = Math.floor((total % 1) * 100);
+    const msFormatted = `<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
 
-    if (state.showSeconds) {
+    if (state.displayMode === 'seconds') {
         const s = Math.floor(total);
-        const formatted = `${s}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
-        timerDisplay.innerHTML = `${formatted}<span class="timer-day-label">초</span>`;
+        timerDisplay.innerHTML = `${s}${msFormatted}<span class="timer-day-label">초</span>`;
         return;
     }
 
+    if (state.displayMode === 'minutes') {
+        const m = Math.floor(total / 60);
+        const s = Math.floor(total % 60);
+        const sStr = s.toString().padStart(2, '0');
+        timerDisplay.innerHTML = `${m}<span class="timer-day-label">분</span> ${sStr}${msFormatted}<span class="timer-day-label">초</span>`;
+        return;
+    }
+
+    // Normal View
     const totalSeconds = Math.floor(total);
     const d = Math.floor(totalSeconds / 86400);
     const h = Math.floor((totalSeconds % 86400) / 3600);
@@ -705,7 +721,7 @@ function renderTime(displaySeconds) {
         s.toString().padStart(2, '0')
     ].join(':');
 
-    timerDisplay.innerHTML = `${formatted}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
+    timerDisplay.innerHTML = `${formatted}${msFormatted}`;
 }
 
 function stopTimerAtZero() {

@@ -320,31 +320,35 @@ select:focus {
     min-height: 1.5rem;
 }
 
-.seconds-toggle-container {
+.display-mode-container {
+    display: flex;
+    background: var(--bg-gray);
+    padding: 3px;
+    border-radius: 20px;
     margin-bottom: 8px;
+    gap: 2px;
 }
 
-.seconds-toggle-btn {
-    background: var(--btn-bg);
+.mode-btn {
+    background: transparent;
     color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-    padding: 4px 12px;
-    border-radius: 20px;
+    border: none;
+    padding: 4px 14px;
+    border-radius: 18px;
     font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
 }
 
-.seconds-toggle-btn:hover {
-    background: var(--border-color);
+.mode-btn:hover {
     color: var(--text-main);
 }
 
-.seconds-toggle-btn.active {
+.mode-btn.active {
     background: var(--primary-teal);
     color: white;
-    border-color: var(--primary-teal);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 
