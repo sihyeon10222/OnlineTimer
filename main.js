@@ -41,7 +41,8 @@ const state = {
     stopwatchMode: 'immediate',
     actualStartTime: null,
     timerName: '',
-    lastIsWaiting: false
+    lastIsWaiting: false,
+    showSeconds: false
 };
 
 // UI Elements
@@ -86,6 +87,7 @@ const swTargetSecondInput = document.getElementById('sw-target-second');
 const timerInfo = document.getElementById('timer-info');
 const timerNameInput = document.getElementById('timer-name-input');
 const timerNameDisplay = document.getElementById('timer-name-display');
+const secondsToggleBtn = document.getElementById('seconds-toggle-btn');
 
 // Timer List Elements
 const timerListSection = document.getElementById('timer-list-section');
@@ -153,6 +155,7 @@ function setupListeners() {
     toggleBtn.addEventListener('click', toggleTimer);
     resetBtn.addEventListener('click', resetTimer);
     shareBtn.addEventListener('click', copyShareLink);
+    secondsToggleBtn.addEventListener('click', toggleSecondsView);
 
     swModeImmediate.addEventListener('click', () => setStopwatchMode('immediate'));
     swModeTarget.addEventListener('click', () => setStopwatchMode('target'));
@@ -227,6 +230,14 @@ function setupListeners() {
     enforceRange(newTargetHour, 1, 12);
     enforceRange(newTargetMinute, 0, 59);
     enforceRange(newTargetSecond, 0, 59);
+}
+
+function toggleSecondsView() {
+    state.showSeconds = !state.showSeconds;
+    secondsToggleBtn.classList.toggle('active', state.showSeconds);
+    secondsToggleBtn.textContent = state.showSeconds ? '일반 보기' : '초로 보기';
+    saveTimerState(state.timerId);
+    updateDisplay();
 }
 
 function setCountdownMode(mode) {
@@ -394,6 +405,10 @@ function loadTimer(id) {
     state.actualStartTime = data.actualStartTime;
     state.duration = data.duration;
     state.timerName = data.timerName || '';
+    state.showSeconds = data.showSeconds || false;
+
+    secondsToggleBtn.classList.toggle('active', state.showSeconds);
+    secondsToggleBtn.textContent = state.showSeconds ? '일반 보기' : '초로 보기';
 
     showTimer();
 }
@@ -449,7 +464,8 @@ function saveTimerState(id) {
         duration: state.duration,
         countdownMode: state.countdownMode,
         actualStartTime: state.actualStartTime,
-        timerName: state.timerName
+        timerName: state.timerName,
+        showSeconds: state.showSeconds
     };
     localStorage.setItem(`timer_state_${id}`, JSON.stringify(timerState));
 }
@@ -663,6 +679,20 @@ function formatDateTime(date) {
 }
 
 function renderTime(displaySeconds) {
+    if (state.showSeconds) {
+        let formatted = '';
+        if (state.type === 'stopwatch') {
+            const total = Math.abs(displaySeconds);
+            const s = Math.floor(total);
+            const ms = Math.floor((total % 1) * 100);
+            formatted = `${s}<span class="timer-ms">${ms.toString().padStart(2, '0')}</span>`;
+        } else {
+            formatted = Math.round(Math.abs(displaySeconds)).toString();
+        }
+        timerDisplay.innerHTML = `${formatted}<span class="timer-day-label">초</span>`;
+        return;
+    }
+
     const totalSeconds = Math.abs(state.type === 'stopwatch' ? Math.floor(displaySeconds) : Math.round(displaySeconds));
     const d = Math.floor(totalSeconds / 86400);
     const h = Math.floor((totalSeconds % 86400) / 3600);

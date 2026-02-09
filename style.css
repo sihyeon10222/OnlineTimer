@@ -316,9 +316,37 @@ select:focus {
     font-size: 1.2rem;
     font-weight: 600;
     color: var(--text-main);
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     min-height: 1.5rem;
 }
+
+.seconds-toggle-container {
+    margin-bottom: 8px;
+}
+
+.seconds-toggle-btn {
+    background: var(--btn-bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.seconds-toggle-btn:hover {
+    background: var(--border-color);
+    color: var(--text-main);
+}
+
+.seconds-toggle-btn.active {
+    background: var(--primary-teal);
+    color: white;
+    border-color: var(--primary-teal);
+}
+
 
 .timer-display {
     font-size: clamp(2rem, 13vw, 15rem);
