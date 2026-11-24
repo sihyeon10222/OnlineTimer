@@ -1,36 +1,21 @@
 .timer-page {
     display: grid;
     justify-items: start;
-    gap: clamp(.875rem, 2.5vw, 1.25rem);
-    max-inline-size: 65rem;
+    gap: clamp(.75rem, 2vw, 1.25rem);
+    max-inline-size: 58rem;
     margin-inline: auto;
-    padding-block-start: clamp(.75rem, 3vw, 2rem);
+    padding-block-start: clamp(.625rem, 2vw, 1.5rem);
 }
 
 .timer-back {
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    min-block-size: var(--control-size);
-    margin-inline-start: -.5rem;
-    padding: .375rem .5rem;
-    border: 0;
-    border-radius: var(--radius-control);
+    border-color: transparent;
     background: transparent;
     color: var(--muted);
-    font-size: .875rem;
-    font-weight: 650;
-    line-height: 1.3;
-}
-
-.timer-back .icon {
-    inline-size: 1rem;
-    block-size: 1rem;
 }
 
 @media (hover: hover) {
     .timer-back:hover {
-        background: var(--accent-soft);
+        background: var(--surface-hover);
         color: var(--accent-text);
     }
 }
@@ -51,10 +36,10 @@
 
 .timer-name-display {
     max-inline-size: 100%;
-    font-size: clamp(1.625rem, 1.1rem + 2vw, 2.875rem);
-    font-weight: 780;
-    letter-spacing: -.045em;
-    line-height: 1.12;
+    font-size: clamp(1.625rem, 1.1rem + 2vw, 2.75rem);
+    font-weight: 720;
+    letter-spacing: -.04em;
+    line-height: 1.15;
     overflow-wrap: anywhere;
 }
 
@@ -124,13 +109,16 @@
 .timer-face {
     container-type: inline-size;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     align-content: center;
     gap: clamp(.75rem, 2.5vw, 1.25rem);
     min-inline-size: 0;
     min-block-size: clamp(12rem, 34vw, 21.5rem);
-    border-block: 1px solid var(--border);
-    padding-block: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: clamp(.75rem, 2.5vw, 1.5rem);
+    background: var(--surface);
     text-align: center;
 }
 
@@ -144,25 +132,31 @@
 }
 
 .display-mode-container {
-    display: flex;
-    gap: .375rem;
+    --segment-padding: .1875rem;
+    --segment-gap: .125rem;
+    --segment-count: 3;
+    grid-auto-columns: minmax(var(--control-size), 1fr);
 }
 
 .display-mode-container button {
-    min-inline-size: var(--control-size);
-    min-block-size: var(--control-size);
-    padding: .25rem;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font-size: .875rem;
+    padding-inline: .375rem;
+    font-size: .8125rem;
 }
 
-.display-mode-container button[aria-pressed="true"] {
-    color: var(--accent-text);
-    font-weight: 700;
-    text-decoration: underline;
-    text-underline-offset: .35em;
+@container (max-width: 10rem) {
+    .display-mode-container {
+        grid-auto-flow: row;
+        grid-template-columns: minmax(0, 1fr);
+        inline-size: 100%;
+    }
+
+    .display-mode-container::before {
+        inset-block-end: auto;
+        inset-inline-end: var(--segment-padding);
+        inline-size: auto;
+        block-size: calc((100% - 2 * var(--segment-padding) - 2 * var(--segment-gap)) / 3);
+        transform: translateY(calc(var(--segment-index, 0) * (100% + var(--segment-gap))));
+    }
 }
 
 .timer-page .secondary-btn:not(:disabled) {
@@ -171,11 +165,9 @@
 }
 
 @media (hover: hover) {
-    .display-mode-container button:hover,
     .timer-page .secondary-btn:hover:not(:disabled) {
+        background: var(--surface-hover);
         color: var(--accent-text);
-        text-decoration: underline;
-        text-underline-offset: .25em;
     }
 }
 
@@ -198,10 +190,37 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -.028em;
     line-height: 1;
+    transition: color var(--motion-micro) var(--ease-out);
 }
 
 .timer-display.finished {
     color: var(--danger);
+}
+
+.timer-display.loading {
+    color: transparent;
+    position: relative;
+}
+
+.timer-display.loading::before {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    inline-size: min(64%, 20rem);
+    block-size: clamp(1.5rem, 8cqi, 3.75rem);
+    border-radius: var(--radius-control);
+    background: var(--surface-muted);
+    transform: translate(-50%, -50%);
+    animation: clock-skeleton 1.15s var(--ease-out) 2 alternate;
+    content: "";
+}
+
+@keyframes clock-skeleton {
+    from { opacity: .52; }
+    to { opacity: 1; }
+}
+
+.timer-display.loading + .timer-info {
+    display: none;
 }
 
 /* Measure the entire row at its natural width, including the fraction and units. */
@@ -215,12 +234,21 @@
     gap: .22em;
 }
 
+.timer-display.loaded .timer-clock {
+    animation: clock-ready var(--motion-hover) var(--ease-out) both;
+}
+
+@keyframes clock-ready {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 .timer-clock-part {
     flex: none;
 }
 
 .timer-ms, .timer-unit {
-    color: var(--accent-text);
+    color: var(--muted);
     font-weight: 680;
     letter-spacing: -.025em;
 }
@@ -343,6 +371,7 @@
     block-size: 100%;
     max-inline-size: none;
     padding-block: calc(max(.5rem, env(safe-area-inset-top)) + var(--control-size)) max(.5rem, env(safe-area-inset-bottom));
+    animation: none;
 }
 
 #app:fullscreen {
@@ -382,6 +411,7 @@
     min-block-size: 0;
     border: 0;
     padding: 0;
+    background: transparent;
 }
 
 #app:fullscreen .timer-display {

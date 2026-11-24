@@ -7,6 +7,7 @@ import {
 
 const el = id => document.getElementById(id);
 const colors = window.matchMedia('(prefers-color-scheme: dark)');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const displayModes = ['normal', 'minutes', 'seconds'];
 const clockNumber = new Intl.NumberFormat('ko-KR');
 const statusNames = { ready: '시작 전', running: '진행 중', paused: '일시정지', waiting: '시작 대기 중', finished: '종료됨' };
@@ -51,11 +52,41 @@ function setText(node, value) {
 
 function setActionLabel(buttonId, labelId, label) {
     setText(el(labelId), label);
-    el(buttonId).title = label;
+    const button = el(buttonId);
+    if (button.dataset.tooltip !== label) {
+        button.dataset.tooltip = label;
+        if (tooltipTrigger === button) showTooltip(button, el('action-tooltip').dataset.visible);
+    }
+}
+
+let tooltipTrigger;
+
+function showTooltip(button, source) {
+    const tooltip = el('action-tooltip');
+    tooltipTrigger = button;
+    setText(tooltip, button.dataset.tooltip);
+    const bounds = button.getBoundingClientRect();
+    const width = tooltip.offsetWidth;
+    const height = tooltip.offsetHeight;
+    const left = Math.max(8, Math.min(bounds.right - width, document.documentElement.clientWidth - width - 8));
+    const top = Math.max(8, bounds.bottom + height + 8 <= innerHeight ? bounds.bottom + 6 : bounds.top - height - 6);
+    Object.assign(tooltip.style, { left: `${left}px`, top: `${top}px` });
+    tooltip.dataset.visible = source;
+}
+
+function hideTooltip() {
+    tooltipTrigger = undefined;
+    delete el('action-tooltip').dataset.visible;
 }
 
 function show(id, visible) {
     el(id).classList.toggle('hidden', !visible);
+}
+
+function motionTiming(element, duration, easing = '--ease-out') {
+    const styles = getComputedStyle(element);
+    const time = styles.getPropertyValue(duration).trim();
+    return { duration: parseFloat(time) * (time.endsWith('ms') ? 1 : 1000), easing: styles.getPropertyValue(easing).trim() };
 }
 
 function nowFor(current) {
@@ -108,8 +139,18 @@ function fillDate(prefix, timestamp) {
 let type = 'countdown';
 let countdownMode = 'duration';
 let stopwatchMode = 'immediate';
+let formResize;
 
-function updateForm() {
+function stopFormResize() {
+    formResize?.cancel();
+    formResize = undefined;
+    delete el('create-options').dataset.resizing;
+}
+
+function updateForm(animate = false) {
+    const options = el('create-options');
+    const fromHeight = animate && !reducedMotion.matches ? options.getBoundingClientRect().height : 0;
+    stopFormResize();
     const countdown = type === 'countdown';
     const buttons = {
         'type-countdown': countdown,
@@ -120,7 +161,6 @@ function updateForm() {
         'sw-mode-target': stopwatchMode === 'scheduled'
     };
     for (const [id, active] of Object.entries(buttons)) {
-        el(id).classList.toggle('active', active);
         el(id).setAttribute('aria-pressed', active);
     }
     show('countdown-settings', countdown);
@@ -130,6 +170,19 @@ function updateForm() {
     show('sw-target-input-group', stopwatchMode === 'scheduled');
     el('timer-name-input').placeholder = countdown ? '타이머 이름을 입력하세요' : '스톱워치 이름을 입력하세요';
     setText(el('create-button-label'), countdown ? '타이머 생성하기' : stopwatchMode === 'immediate' ? '스톱워치 시작하기' : '스톱워치 생성하기');
+    if (fromHeight) {
+        const toHeight = options.getBoundingClientRect().height;
+        if (Math.abs(toHeight - fromHeight) > 1) {
+            options.dataset.resizing = '';
+            formResize = options.animate(
+                [{ height: `${fromHeight}px` }, { height: `${toHeight}px` }],
+                motionTiming(options, '--motion-dropdown')
+            );
+            formResize.onfinish = event => {
+                if (formResize === event.target) stopFormResize();
+            };
+        }
+    }
 }
 
 function updatePresetSelection() {
@@ -215,6 +268,8 @@ function readLegacyHash(hash) {
 }
 
 function resetView() {
+    stopFormResize();
+    hideTooltip();
     clearTimeout(session?.retryTimer);
     session?.stop?.();
     el('change-target-modal').close();
@@ -223,6 +278,8 @@ function resetView() {
     setText(el('create-status'), '');
     setText(el('timer-status'), '');
     el('timer-status').removeAttribute('data-status');
+    el('timer-display').classList.remove('loading', 'loaded');
+    el('timer-display').removeAttribute('aria-busy');
 }
 
 function openRoute() {
@@ -234,7 +291,7 @@ function openRoute() {
     show('timer-view', Boolean(hash));
     if (!hash) {
         if (document.fullscreenElement === el('app')) void document.exitFullscreen().catch(() => {});
-        renderLists();
+        renderLists(true);
         return;
     }
 
@@ -520,8 +577,12 @@ function wholeTime(total) {
 function updateTimerFrame(current, reading) {
     const display = el('timer-display');
     if (!reading) {
+        const loading = current.connection === 'connecting';
         setText(display, '–:––:––');
-        display.setAttribute('aria-label', current.connection === 'connecting' ? '시간 불러오는 중' : '시간 정보 없음');
+        display.setAttribute('aria-label', loading ? '시간 불러오는 중' : '시간 정보 없음');
+        display.classList.toggle('loading', loading);
+        display.classList.remove('loaded');
+        display.setAttribute('aria-busy', loading);
         display.style.removeProperty('--timer-fit');
         display.classList.remove('finished');
         show('timer-info', false);
@@ -530,6 +591,10 @@ function updateTimerFrame(current, reading) {
         current.lastStatus = undefined;
         return;
     }
+    if (display.classList.contains('loading')) {
+        display.classList.replace('loading', 'loaded');
+    }
+    if (display.hasAttribute('aria-busy')) display.removeAttribute('aria-busy');
     const timer = current.timer;
     renderTime(current, display, reading.valueMs);
     if (current.lastStatus !== reading.status || current.endAt !== reading.endAt || current.startedAt !== timer.startedAt) {
@@ -618,6 +683,7 @@ function listItem(timer, live, index) {
     const time = item.querySelector('.timer-list-time');
     const remove = item.querySelector('.timer-list-btn');
     const stopwatch = timer.type === 'stopwatch' || timer.mode === 'immediate' || timer.mode === 'scheduled';
+    item.dataset.key = `${live ? 'live' : 'local'}:${timer.id}`;
     link.href = live ? timer.hash : `#/${timer.id}`;
     name.id = `saved-timer-name-${index}`;
     name.textContent = timer.name || modeNames[timer.mode] || (stopwatch ? '스톱워치' : '타이머');
@@ -648,7 +714,7 @@ function listItem(timer, live, index) {
             if (!live) {
                 try { localStorage.removeItem(`timer_state_${timer.id}`); } catch { /* The list entry is already removed. */ }
             }
-            renderLists();
+            renderLists(true);
             const rows = el('timer-list-container').children;
             const next = rows[Math.min(index, rows.length - 1)]?.querySelector('.timer-list-info');
             (next ?? el('saved-title')).focus();
@@ -657,11 +723,55 @@ function listItem(timer, live, index) {
     return item;
 }
 
+function animateSavedRows(section, rows, previous) {
+    const timing = motionTiming(section, '--motion-panel', '--ease-spring');
+    for (const row of rows) {
+        const prior = previous.get(row.dataset.key);
+        previous.delete(row.dataset.key);
+        if (!prior) {
+            row.animate([{ opacity: 0, transform: 'translateY(-.35rem)' }, { opacity: 1, transform: 'none' }], timing);
+            continue;
+        }
+        const offset = prior.bounds.top - row.getBoundingClientRect().top;
+        if (Math.abs(offset) > 1) {
+            row.animate([{ transform: `translateY(${offset}px)` }, { transform: 'none' }], timing);
+        }
+    }
+    const bounds = section.getBoundingClientRect();
+    for (const { row, bounds: prior } of previous.values()) {
+        const ghost = document.createElement('div');
+        ghost.className = row.className;
+        ghost.inert = true;
+        ghost.setAttribute('aria-hidden', 'true');
+        ghost.append(...row.cloneNode(true).childNodes);
+        for (const node of ghost.querySelectorAll('[id]')) node.removeAttribute('id');
+        Object.assign(ghost.style, {
+            top: `${prior.top - bounds.top}px`,
+            left: `${prior.left - bounds.left}px`,
+            width: `${prior.width}px`
+        });
+        section.append(ghost);
+        const exit = ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-.25rem)' }],
+            motionTiming(section, '--motion-hover'));
+        exit.onfinish = exit.oncancel = () => ghost.remove();
+    }
+}
+
 let listUpdatedAt = -1;
-function renderLists() {
+function renderLists(animate = false) {
+    const list = el('timer-list-container');
+    const animateRows = animate && !reducedMotion.matches && !el('saved-panel').inert;
+    const previous = new Map();
+    const previousHeight = animateRows ? list.getBoundingClientRect().height : 0;
+    if (animateRows) {
+        for (const row of list.children) {
+            previous.set(row.dataset.key, { row, bounds: row.getBoundingClientRect() });
+        }
+        for (const animation of list.getAnimations()) animation.cancel();
+    }
     const live = getList('liveTimers').filter(item => typeof item.hash === 'string' && item.hash.startsWith('#/live/') && parseLiveHash(item.hash));
     const local = getList('timerList').filter(item => /^[a-zA-Z0-9_-]{1,80}$/.test(item.id));
-    el('timer-list-container').replaceChildren(
+    list.replaceChildren(
         ...live.map((item, index) => listItem(item, true, index)),
         ...local.map((item, index) => listItem(item, false, live.length + index))
     );
@@ -669,6 +779,14 @@ function renderLists() {
     show('timer-list-container', hasTimers);
     show('timer-list-empty', !hasTimers);
     listUpdatedAt = -1;
+    updateList();
+    if (animateRows) {
+        const height = list.getBoundingClientRect().height;
+        if (height && previousHeight > height + 1) {
+            list.animate([{ minHeight: `${previousHeight}px` }, { minHeight: `${height}px` }], motionTiming(list, '--motion-panel'));
+        }
+        animateSavedRows(el('timer-list-section'), list.children, previous);
+    }
 }
 
 function updateList() {
@@ -822,7 +940,6 @@ function setDisplayMode(mode) {
     displayMode = mode;
     for (const value of displayModes) {
         const button = el(`mode-${value}-btn`);
-        button.classList.toggle('active', mode === value);
         button.setAttribute('aria-pressed', mode === value);
     }
 }
@@ -830,8 +947,6 @@ function setDisplayMode(mode) {
 function setTheme(theme) {
     const dark = theme === 'dark';
     document.body.classList.toggle('dark-mode', dark);
-    show('theme-icon-sun', dark);
-    show('theme-icon-moon', !dark);
     el('theme-toggle').setAttribute('aria-pressed', dark);
 }
 
@@ -848,12 +963,18 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-el('type-countdown').onclick = () => { type = 'countdown'; updateForm(); };
-el('type-stopwatch').onclick = () => { type = 'stopwatch'; updateForm(); };
-el('mode-duration').onclick = () => { countdownMode = 'duration'; updateForm(); };
-el('mode-target').onclick = () => { countdownMode = 'deadline'; updateForm(); };
-el('sw-mode-immediate').onclick = () => { stopwatchMode = 'immediate'; updateForm(); };
-el('sw-mode-target').onclick = () => { stopwatchMode = 'scheduled'; updateForm(); };
+el('type-countdown').onclick = () => { type = 'countdown'; updateForm(true); };
+el('type-stopwatch').onclick = () => { type = 'stopwatch'; updateForm(true); };
+el('mode-duration').onclick = () => { countdownMode = 'duration'; updateForm(true); };
+el('mode-target').onclick = () => { countdownMode = 'deadline'; updateForm(true); };
+el('sw-mode-immediate').onclick = () => { stopwatchMode = 'immediate'; updateForm(true); };
+el('sw-mode-target').onclick = () => { stopwatchMode = 'scheduled'; updateForm(true); };
+window.addEventListener('resize', stopFormResize);
+reducedMotion.addEventListener('change', () => {
+    if (!reducedMotion.matches) return;
+    stopFormResize();
+    for (const animation of el('timer-list-section').getAnimations({ subtree: true })) animation.cancel();
+});
 el('duration-input-group').addEventListener('input', updatePresetSelection);
 for (const button of document.querySelectorAll('[data-minutes]')) {
     button.addEventListener('click', () => {
@@ -875,6 +996,13 @@ el('landing-view').addEventListener('pointerdown', event => {
     const pending = el('timer-list-container').querySelector('.confirming');
     if (pending && !pending.contains(event.target)) setRemovalConfirmation(pending, false);
 });
+el('saved-toggle').onclick = event => {
+    const panel = el('saved-panel');
+    panel.inert = !panel.inert;
+    if (panel.inert) panel.setAttribute('aria-hidden', 'true');
+    else panel.removeAttribute('aria-hidden');
+    event.currentTarget.setAttribute('aria-expanded', !panel.inert);
+};
 el('back-to-home').onclick = () => { window.location.hash = ''; };
 el('retry-btn').onclick = openRoute;
 el('reset-btn').onclick = () => performCommand({ type: 'reset' });
@@ -969,7 +1097,30 @@ document.addEventListener('visibilitychange', () => {
     }).catch(() => {});
 });
 window.addEventListener('storage', () => {
-    if (!session) renderLists();
+    if (!session) renderLists(true);
+});
+
+for (const button of document.querySelectorAll('[data-tooltip]')) {
+    button.addEventListener('pointerenter', event => {
+        if (event.pointerType === 'mouse') showTooltip(button, 'hover');
+    });
+    button.addEventListener('pointerleave', () => {
+        if (tooltipTrigger === button && !button.matches(':focus-visible')) hideTooltip();
+    });
+    button.addEventListener('focus', () => {
+        if (button.matches(':focus-visible')) showTooltip(button, 'focus');
+    });
+    button.addEventListener('blur', () => {
+        if (tooltipTrigger === button) hideTooltip();
+    });
+}
+window.addEventListener('resize', hideTooltip);
+document.addEventListener('scroll', hideTooltip, { capture: true, passive: true });
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && tooltipTrigger) hideTooltip();
+});
+el('timer-display').addEventListener('animationend', event => {
+    if (event.animationName === 'clock-ready') el('timer-display').classList.remove('loaded');
 });
 
 const defaultTargetAt = nextWholeHour(Date.now());
@@ -979,4 +1130,5 @@ updateForm();
 setDisplayMode(displayMode);
 setTheme(preferredTheme());
 openRoute();
+el('landing-view').inert = false;
 requestAnimationFrame(tick);

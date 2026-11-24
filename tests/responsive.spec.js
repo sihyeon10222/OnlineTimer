@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { encodeSnapshot, normalizeLegacy } from '../legacy.js';
 
 const viewports = [
     [320, 568], [375, 667], [390, 844], [430, 932],
@@ -192,6 +193,125 @@ test('rotating and resizing keep the open dialog and its controls reachable', as
     }
     await expectDialog(page, '#change-target-modal', () => page.keyboard.press('Escape'), '#change-target-btn');
     await expectLayout(page, 'timer after resizing');
+});
+
+test('motion follows form changes, list updates, dialogs and keyboard interaction', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    await loadSavedTimers(page);
+
+    await page.locator('#mode-target').click();
+    const ampm = page.locator('#target-ampm');
+    if (await ampm.evaluate(element => getComputedStyle(element).appearance === 'base-select')) {
+        await ampm.click();
+        await expect(ampm).toHaveCSS('appearance', 'base-select');
+        await expect.poll(() => ampm.evaluate(element => element.matches(':open'))).toBe(true);
+        await page.keyboard.press('Escape');
+        await expect.poll(() => ampm.evaluate(element => element.matches(':open'))).toBe(false);
+    }
+    await page.locator('#mode-duration').click();
+    await expect(page.locator('#create-options')).not.toHaveAttribute('data-resizing');
+    const options = page.locator('#create-options');
+    const selector = page.locator('.timer-type-selector');
+    const selection = () => selector.evaluate(element => getComputedStyle(element, '::before').transform);
+    const initialSelection = await selection();
+    const expansion = await options.evaluate(element => {
+        document.querySelector('#type-stopwatch').click();
+        const resize = element.getAnimations().find(animation => animation.effect.getKeyframes().some(frame => frame.height));
+        return resize?.effect.getTiming().duration;
+    });
+    expect(expansion).toBe(220);
+    await expect.poll(selection).not.toBe(initialSelection);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(options).not.toHaveAttribute('data-resizing');
+    await page.locator('#sw-mode-target').click();
+    await expect(page.locator('#sw-target-date')).toBeVisible();
+    await expect(options).not.toHaveAttribute('data-resizing');
+    await expectLayout(page, 'scheduled form after expansion and resize');
+
+    const toggle = page.locator('#saved-toggle');
+    const panel = page.locator('#saved-panel');
+    const expandedHeight = (await panel.boundingBox()).height;
+    await toggle.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('link', { name: /프로젝트 마감/ })).toHaveCount(0);
+    await expect.poll(async () => (await panel.boundingBox())?.height || 0).toBe(0);
+    await toggle.press('Enter');
+    await expect.poll(async () => (await panel.boundingBox()).height).toBeCloseTo(expandedHeight);
+
+    const rowChanges = await panel.evaluate(element => {
+        const timers = JSON.parse(localStorage.getItem('timerList'));
+        localStorage.setItem('timerList', JSON.stringify([{ id: 'new', name: '새 항목', type: 'stopwatch' }, ...timers.reverse()]));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'timerList' }));
+        return [...element.querySelectorAll('li')].map(row => row.getAnimations().flatMap(animation => animation.effect.getKeyframes()));
+    });
+    expect(rowChanges[0][0].opacity).toBe('0');
+    expect(rowChanges[1][0].transform).toMatch(/translateY/);
+    await expect(page.getByRole('link', { name: /새 항목/ })).toBeVisible();
+    const exit = await page.locator('[data-key="local:new"] button').evaluate(button => {
+        button.click();
+        button.click();
+        return document.querySelector('.timer-list-item[aria-hidden]')?.getAnimations()[0]?.effect.getTiming().duration;
+    });
+    expect(exit).toBe(180);
+    await expect(page.locator('.timer-list-item[aria-hidden]')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /새 항목/ })).toHaveCount(0);
+
+    await page.getByRole('link', { name: /프로젝트 마감/ }).click();
+    await expect(page.locator('#timer-name-display')).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#back-to-home')).toBeFocused();
+    const tooltip = page.locator('#action-tooltip');
+    await expect(tooltip).toHaveAttribute('data-visible', 'focus');
+    await expect(tooltip).toHaveText('타이머 만들기');
+    await page.keyboard.press('Escape');
+    await expect(tooltip).not.toHaveAttribute('data-visible');
+
+    await activateWithKeyboard(page, '#change-target-btn');
+    const dialog = page.locator('#change-target-modal');
+    await expect(dialog).toHaveCSS('opacity', '1');
+    await expectDialogFits(page, '#change-target-modal');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(page.locator('#change-target-btn')).toBeFocused();
+
+    await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
+    await expect(page.locator('body')).toHaveClass('dark-mode');
+    await capture(page, '390-dark-timer');
+    await page.locator('#back-to-home').click();
+    await page.locator('#type-countdown').click();
+    await expect(options).not.toHaveAttribute('data-resizing');
+    await expect(page.locator('#landing-view')).toHaveCSS('animation-name', 'none');
+    expect(await selection()).toBe(initialSelection);
+    await expectLayout(page, 'dark home with reduced motion');
+    await capture(page, '390-dark-home');
+});
+
+test('a shared timer uses a skeleton until its clock is ready', async ({ page }) => {
+    const timer = normalizeLegacy({ type: 'stopwatch', active: false, pauseTime: 90, timerName: '공유 스톱워치' }, Date.now());
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    await page.route('**/api/query', async route => {
+        await gate;
+        await route.fulfill({
+            headers: { 'access-control-allow-origin': '*' },
+            json: { status: 'success', value: { role: 'snapshot', snapshot: encodeSnapshot(timer).slice(2) } }
+        });
+    });
+    try {
+        await page.goto('/#s/ABCDEFGHIJKLMNOPQRSTUV');
+        const display = page.locator('#timer-display');
+        await expect(display).toHaveClass(/loading/);
+        await expect(display).toHaveAttribute('aria-busy', 'true');
+        await expect(display).toHaveAccessibleName('시간 불러오는 중');
+        expect(await display.evaluate(element => getComputedStyle(element, '::before').animationName)).toBe('clock-skeleton');
+        release();
+        await expect(page.locator('#timer-name-display')).toHaveText('공유 스톱워치');
+        await expect(display).not.toHaveAttribute('aria-busy');
+        await expect(display.locator('.timer-clock')).toHaveText('00:01:3000');
+    } finally {
+        release();
+    }
 });
 
 test.describe('saved timers on touch', () => {
