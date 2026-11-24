@@ -80,6 +80,16 @@ function dateFromFields(prefix) {
     return parsed.getTime();
 }
 
+function nextWholeHour(timestamp) {
+    const date = new Date(timestamp);
+    date.setHours(date.getHours() + 1, 0, 0, 0);
+    if (date.getMinutes() !== 0) {
+        // A daylight-saving transition can skip the beginning of a local hour.
+        date.setHours(date.getHours() + 1, 0, 0, 0);
+    }
+    return date.getTime();
+}
+
 function fillDate(prefix, timestamp) {
     const date = new Date(timestamp);
     const hours = date.getHours();
@@ -661,7 +671,7 @@ el('restart-btn').onclick = () => performCommand({ type: 'restart' });
 el('toggle-btn').onclick = event => performCommand({ type: event.currentTarget.dataset.command });
 el('change-target-btn').onclick = () => {
     session.targetEditRevision = session.timer.revision;
-    fillDate('new-target', session.timer.targetAt > 0 ? session.timer.targetAt : nowFor(session) + 3600000);
+    fillDate('new-target', session.timer.targetAt > 0 ? session.timer.targetAt : nextWholeHour(nowFor(session)));
     setText(el('target-feedback'), '');
     el('change-target-modal').showModal();
 };
@@ -737,8 +747,9 @@ window.addEventListener('storage', () => {
     if (!session) renderLists();
 });
 
-fillDate('target', Date.now() + 3600000);
-fillDate('sw-target', Date.now() + 3600000);
+const defaultTargetAt = nextWholeHour(Date.now());
+fillDate('target', defaultTargetAt);
+fillDate('sw-target', defaultTargetAt);
 updateForm();
 setDisplayMode(displayMode);
 setTheme(preferredTheme());

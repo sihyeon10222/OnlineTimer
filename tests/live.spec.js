@@ -27,6 +27,31 @@ async function localDateInput(page, prefix, timestamp) {
     await page.locator(`#${prefix}-second`).fill(String(date.getUTCSeconds()));
 }
 
+test.describe('scheduled input defaults', () => {
+    test.use({ timezoneId: 'Asia/Seoul' });
+
+    test('countdown and stopwatch default to the next local hour', async ({ page, baseURL }) => {
+        await page.clock.setFixedTime(new Date('2026-11-24T23:42:37+09:00'));
+        await page.goto(baseURL);
+        await page.locator('#mode-target').click();
+
+        await expect(page.locator('#target-date')).toHaveValue('2026-11-25');
+        await expect(page.locator('#target-ampm')).toHaveValue('AM');
+        await expect(page.locator('#target-hour')).toHaveValue('12');
+        await expect(page.locator('#target-minute')).toHaveValue('00');
+        await expect(page.locator('#target-second')).toHaveValue('00');
+
+        await page.locator('#type-stopwatch').click();
+        await page.locator('#sw-mode-target').click();
+
+        await expect(page.locator('#sw-target-date')).toHaveValue('2026-11-25');
+        await expect(page.locator('#sw-target-ampm')).toHaveValue('AM');
+        await expect(page.locator('#sw-target-hour')).toHaveValue('12');
+        await expect(page.locator('#sw-target-minute')).toHaveValue('00');
+        await expect(page.locator('#sw-target-second')).toHaveValue('00');
+    });
+});
+
 test('two browser contexts share countdown, reconnect, reopen and keep running without the creator', async ({ browser, baseURL }) => {
     const controllerContext = await browser.newContext({ timezoneId: 'UTC', permissions: ['clipboard-read', 'clipboard-write'] });
     const viewerContext = await browser.newContext({ ...devices['iPhone 13'], defaultBrowserType: undefined, timezoneId: 'Asia/Seoul' });
