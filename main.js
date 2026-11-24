@@ -8,6 +8,7 @@ import {
 const el = id => document.getElementById(id);
 const colors = window.matchMedia('(prefers-color-scheme: dark)');
 const displayModes = ['normal', 'minutes', 'seconds'];
+const clockNumber = new Intl.NumberFormat('ko-KR');
 const statusNames = { ready: '시작 전', running: '진행 중', paused: '일시정지', waiting: '시작 대기 중', finished: '종료됨' };
 const modeNames = { duration: '타이머', deadline: '종료 시점 타이머', immediate: '스톱워치', scheduled: '예약 스톱워치' };
 const errors = {
@@ -472,27 +473,29 @@ function renderTime(current, display, valueMs) {
         const seconds = total % 60;
         const hours = Math.floor(total / 3600) % 24;
         let label;
-        // Reserve width for tabular digits, the fraction, and the abbreviated units.
+        // Count grouping separators in the initial width estimate.
         let fit = 5.5;
         if (displayMode === 'seconds') {
-            const digits = String(total);
-            setText(parts.time, digits);
-            label = `${total}초`;
-            fit = digits.length * 0.65 + 1.45;
+            const formattedSeconds = clockNumber.format(total);
+            setText(parts.time, formattedSeconds);
+            label = `${formattedSeconds}초`;
+            fit = formattedSeconds.length * 0.65 + 1.45;
         } else if (displayMode === 'minutes') {
-            const digits = String(minutes);
-            setText(parts.minutes, digits);
+            const formattedMinutes = clockNumber.format(minutes);
+            setText(parts.minutes, formattedMinutes);
             setText(parts.time, pad(seconds));
-            label = `${minutes}분 ${seconds}초`;
-            fit = (digits.length + 2) * 0.65 + 2;
+            label = `${formattedMinutes}분 ${seconds}초`;
+            fit = (formattedMinutes.length + 2) * 0.65 + 2;
         } else {
+            let dayLabel = '';
             if (parts.days) {
-                const digits = String(days);
-                setText(parts.days, digits);
-                fit += digits.length * 0.65 + 0.85;
+                const formattedDays = clockNumber.format(days);
+                setText(parts.days, formattedDays);
+                dayLabel = `${formattedDays}일 `;
+                fit += formattedDays.length * 0.65 + 0.85;
             }
             setText(parts.time, clockTime(total));
-            label = `${days ? `${days}일 ` : ''}${hours}시간 ${minutes % 60}분 ${seconds}초`;
+            label = `${dayLabel}${hours}시간 ${minutes % 60}분 ${seconds}초`;
         }
         if (parts.fit !== fit) {
             parts.clock.style.removeProperty('--clock-fit-size');
@@ -511,7 +514,7 @@ function clockTime(total) {
 
 function wholeTime(total) {
     const days = Math.floor(total / 86400);
-    return `${days ? `${days}일 ` : ''}${clockTime(total)}`;
+    return `${days ? `${clockNumber.format(days)}일 ` : ''}${clockTime(total)}`;
 }
 
 function updateTimerFrame(current, reading) {

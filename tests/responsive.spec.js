@@ -205,9 +205,15 @@ test('the clock fits wide glyphs and scaled layouts in both timer views', async 
     await page.setViewportSize({ width: 844, height: 620 });
     await page.goto('/');
     await loadSavedTimers(page);
+    await expect(page.getByText('100,000,000일 00:00:00 · 일시정지')).toBeVisible();
     await page.getByRole('link', { name: new RegExp(longName) }).click();
     await page.addStyleTag({ content: '.timer-clock { font-family: monospace; letter-spacing: .16em; }' });
 
+    const groupedValues = {
+        normal: ['[data-days]', '100,000,000'],
+        minutes: ['[data-minutes]', '144,000,000,000'],
+        seconds: ['[data-time]', '8,640,000,000,000']
+    };
     const clockOverflow = () => page.locator('#timer-display').evaluate(display => {
         const bounds = display.getBoundingClientRect();
         const clock = display.querySelector('.timer-clock');
@@ -218,8 +224,9 @@ test('the clock fits wide glyphs and scaled layouts in both timer views', async 
         );
     });
 
-    for (const mode of ['normal', 'minutes', 'seconds']) {
+    for (const [mode, [selector, value]] of Object.entries(groupedValues)) {
         await page.locator(`#mode-${mode}-btn`).click();
+        await expect(page.locator(`#timer-display ${selector}`)).toHaveText(value);
         await expect.poll(clockOverflow, `regular layout, ${mode}`).toBe(false);
     }
     if (!(await page.evaluate(() => document.fullscreenEnabled))) return;
@@ -232,8 +239,9 @@ test('the clock fits wide glyphs and scaled layouts in both timer views', async 
     ]) {
         await page.setViewportSize({ width, height });
         await page.locator('#timer-display').evaluate((display, scale) => { display.style.zoom = scale; }, scale);
-        for (const mode of ['normal', 'minutes', 'seconds']) {
+        for (const [mode, [selector, value]] of Object.entries(groupedValues)) {
             await page.locator(`#mode-${mode}-btn`).evaluate(button => button.click());
+            await expect(page.locator(`#timer-display ${selector}`)).toHaveText(value);
             await expect.poll(clockOverflow, `fullscreen ${width}x${height} scale ${scale}, ${mode}`).toBe(false);
             await expect.poll(() => page.locator('#app').evaluate(app => {
                 const bounds = app.getBoundingClientRect();
