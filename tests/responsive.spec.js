@@ -208,6 +208,8 @@ test('fullscreen clock and controls stay within the available area after resizin
     test.skip(!(await page.evaluate(() => document.fullscreenEnabled)), 'Fullscreen API unavailable');
     await page.locator('#fullscreen-btn').click();
     await expect(page.locator('#app:fullscreen')).toBeVisible();
+    // Exercise wider glyph metrics than the system font used by the test runner.
+    await page.addStyleTag({ content: '.timer-clock { font-family: monospace; letter-spacing: .16em; }' });
 
     for (const [width, height] of [[1920, 1080], [320, 568], [844, 390], [844, 180], [620, 140], [1180, 820]]) {
         await page.setViewportSize({ width, height });
@@ -220,6 +222,16 @@ test('fullscreen clock and controls stay within the available area after resizin
                 if (app.scrollHeight > app.clientHeight + 1) overflow.push('vertical scrolling');
                 const right = bounds.left + app.clientWidth;
                 const bottom = bounds.top + app.clientHeight;
+                const display = app.querySelector('#timer-display');
+                const text = document.createRange();
+                text.selectNodeContents(display.querySelector('.timer-clock'));
+                const displayBounds = display.getBoundingClientRect();
+                for (const rect of text.getClientRects()) {
+                    if (rect.left < displayBounds.left - 1 || rect.right > displayBounds.right + 1) {
+                        overflow.push('clock text extends outside the display');
+                        break;
+                    }
+                }
                 return [...app.querySelectorAll('#timer-view button, .timer-clock-part')]
                     .filter(element => element.checkVisibility())
                     .filter(element => {

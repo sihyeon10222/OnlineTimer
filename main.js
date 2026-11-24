@@ -418,6 +418,25 @@ function render() {
     updateTimerFrame(current, reading);
 }
 
+const fullscreenClockObserver = new ResizeObserver(([{ target: clock }]) => {
+    requestAnimationFrame(() => {
+        if (!clock.isConnected || document.fullscreenElement !== el('app')) return;
+        const fontSize = parseFloat(getComputedStyle(clock).fontSize);
+        if (!fontSize) return;
+        const fit = Math.ceil(clock.getBoundingClientRect().width / fontSize * 100) / 100;
+        const previous = Number(clock.style.getPropertyValue('--clock-width-in-em'));
+        if (fit && Math.abs(fit - previous) > 0.02) {
+            clock.style.setProperty('--clock-width-in-em', fit);
+        }
+    });
+});
+
+function observeFullscreenClock() {
+    fullscreenClockObserver.disconnect();
+    const clock = el('timer-display').querySelector('.timer-clock');
+    if (clock && document.fullscreenElement === el('app')) fullscreenClockObserver.observe(clock);
+}
+
 function renderTime(current, display, valueMs) {
     const total = Math.floor(valueMs / 1000);
     const days = Math.floor(total / 86400);
@@ -437,6 +456,7 @@ function renderTime(current, display, valueMs) {
             time: display.querySelector('[data-time]'),
             fraction: display.querySelector('[data-fraction]')
         };
+        observeFullscreenClock();
     }
 
     if (parts.total !== total) {
@@ -892,6 +912,7 @@ document.addEventListener('fullscreenchange', () => {
     const fullscreen = document.fullscreenElement === el('app');
     el('fullscreen-icon').setAttribute('href', fullscreen ? '#icon-minimize' : '#icon-maximize');
     setActionLabel('fullscreen-btn', 'fullscreen-label', fullscreen ? '전체 화면 닫기' : '전체 화면');
+    observeFullscreenClock();
 });
 el('alarm-btn').onclick = toggleAlarm;
 for (const mode of displayModes) {
