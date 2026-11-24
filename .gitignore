@@ -8,3 +8,5 @@ convex/_generated/
 .vercel/
 playwright-report/
 test-results/
+
+.DS_Store

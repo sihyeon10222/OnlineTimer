@@ -124,7 +124,16 @@ function updateForm() {
     show('target-input-group', countdownMode === 'deadline');
     show('sw-target-input-group', stopwatchMode === 'scheduled');
     el('timer-name-input').placeholder = countdown ? '타이머 이름을 입력하세요' : '스톱워치 이름을 입력하세요';
-    setText(el('create-btn'), countdown ? '타이머 생성하기' : stopwatchMode === 'immediate' ? '스톱워치 시작하기' : '스톱워치 생성하기');
+    setText(el('create-button-label'), countdown ? '타이머 생성하기' : stopwatchMode === 'immediate' ? '스톱워치 시작하기' : '스톱워치 생성하기');
+}
+
+function updatePresetSelection() {
+    const hours = Number(el('countdown-hours').value);
+    const minutes = Number(el('countdown-minutes').value);
+    const seconds = Number(el('countdown-seconds').value);
+    for (const button of el('duration-input-group').querySelectorAll('[data-minutes]')) {
+        button.setAttribute('aria-pressed', hours === 0 && seconds === 0 && minutes === Number(button.dataset.minutes));
+    }
 }
 
 function formSettings() {
@@ -218,6 +227,7 @@ function openRoute() {
     show('landing-view', !hash);
     show('timer-view', Boolean(hash));
     if (!hash) {
+        if (document.fullscreenElement === el('app')) void document.exitFullscreen().catch(() => {});
         renderLists();
         return;
     }
@@ -354,7 +364,9 @@ function changeStatus(current, reading) {
     const state = current.connection || 'local';
     status.dataset.status = state === 'view' ? 'live' : state;
     setText(status, labels[state] || '이 기기에서만 실행 중');
-    setText(el('timer-type-label'), reading ? `${modeNames[current.timer.mode]} · ${statusNames[reading.status]}` : '');
+    const typeLabel = el('timer-type-label');
+    setText(typeLabel, reading ? `${modeNames[current.timer.mode]} · ${statusNames[reading.status]}` : '');
+    typeLabel.dataset.state = reading?.status || '';
     show('retry-btn', current.isLive && state === 'offline');
 }
 
@@ -372,8 +384,8 @@ function renderControls(current, reading) {
     const toggling = reading?.status === 'running';
     const toggle = el('toggle-btn');
     toggle.dataset.command = toggling ? 'pause' : 'start';
-    setText(toggle, toggling ? '일시정지' : reading?.status === 'paused' ? '재개' : '시작');
-    toggle.classList.toggle('pause', toggling);
+    setText(el('toggle-label'), toggling ? '일시정지' : reading?.status === 'paused' ? '재개' : '시작');
+    el('toggle-icon').setAttribute('href', toggling ? '#icon-pause' : '#icon-play');
 }
 
 function render() {
@@ -381,14 +393,15 @@ function render() {
     const current = session;
     const timer = current.timer;
     const reading = timer && (!current.isLive || current.clock) && timerReading(timer, nowFor(current));
-    setText(el('timer-name-display'), timer?.name || '');
+    setText(el('timer-name-display'), timer?.name || modeNames[timer?.mode] || '타이머');
     show('share-btn', Boolean(timer));
-    setText(el('share-btn'), current.isLive ? '보기 링크 복사' : '스냅샷 링크 복사');
+    setText(el('share-label'), current.isLive ? '보기 링크 복사' : '스냅샷 링크 복사');
     show('control-link-btn', Boolean(timer && current.allowed));
-    setText(el('control-link-btn'), current.role === 'manage' ? '비공개 관리 링크 복사' : '조작 링크 복사');
+    setText(el('control-link-label'), current.role === 'manage' ? '비공개 관리 링크 복사' : '조작 링크 복사');
     show('promote-btn', Boolean(timer && !current.isLive));
     show('alarm-btn', Boolean(timer && isCountdown(timer)));
     show('fullscreen-btn', Boolean(document.fullscreenEnabled && timer));
+    show('display-modes', Boolean(reading));
     show('retry-btn', current.isLive && current.connection === 'offline');
     if (current.connection === 'view') setText(el('timer-feedback'), '이 링크의 조작 권한을 확인할 수 없습니다.');
     if (current.allowed && unstoredLink === current.hash) {
@@ -401,36 +414,80 @@ function render() {
     updateTimerFrame(current, reading);
 }
 
-function renderTime(valueMs) {
+function renderTime(current, display, valueMs) {
     const total = Math.floor(valueMs / 1000);
-    const fraction = `<span class="timer-ms">${pad(Math.floor(valueMs / 10) % 100)}</span>`;
-    const unit = text => `<span class="timer-day-label">${text}</span>`;
-    if (displayMode === 'seconds') return `${total}${fraction}${unit('초')}`;
-    if (displayMode === 'minutes') return `${Math.floor(total / 60)}${unit('분')} ${pad(total % 60)}${fraction}${unit('초')}`;
-    return wholeTime(total, unit) + fraction;
+    const days = Math.floor(total / 86400);
+    const showDays = displayMode === 'normal' && days > 0;
+    let parts = current.displayParts;
+
+    if (!parts || parts.mode !== displayMode || parts.showDays !== showDays) {
+        const unit = text => `<span class="timer-unit">${text}</span>`;
+        const dayMarkup = showDays ? '<span class="timer-days" aria-hidden="true"><span data-days></span>일 </span>' : '';
+        const minutesMarkup = displayMode === 'minutes' ? `<span class="timer-clock-part"><span data-minutes></span>${unit('분')} </span>` : '';
+        const secondsUnit = displayMode === 'normal' ? '' : unit('초');
+        display.innerHTML = `${dayMarkup}<span class="timer-clock" aria-hidden="true">${minutesMarkup}<span class="timer-clock-part"><span data-time></span><span class="timer-ms" data-fraction></span>${secondsUnit}</span></span>`;
+        parts = current.displayParts = {
+            mode: displayMode, showDays,
+            days: display.querySelector('[data-days]'),
+            minutes: display.querySelector('[data-minutes]'),
+            time: display.querySelector('[data-time]'),
+            fraction: display.querySelector('[data-fraction]')
+        };
+    }
+
+    if (parts.total !== total) {
+        const minutes = Math.floor(total / 60);
+        const seconds = total % 60;
+        const hours = Math.floor(total / 3600) % 24;
+        let label;
+        // Reserve width for tabular digits, the fraction, and the abbreviated units.
+        let fit = 5.5;
+        if (displayMode === 'seconds') {
+            const digits = String(total);
+            setText(parts.time, digits);
+            label = `${total}초`;
+            fit = digits.length * 0.65 + 1.45;
+        } else if (displayMode === 'minutes') {
+            const digits = String(minutes);
+            setText(parts.minutes, digits);
+            setText(parts.time, pad(seconds));
+            label = `${minutes}분 ${seconds}초`;
+            fit = (digits.length + 2) * 0.65 + 2;
+        } else {
+            if (parts.days) setText(parts.days, String(days));
+            setText(parts.time, clockTime(total));
+            label = `${days ? `${days}일 ` : ''}${hours}시간 ${minutes % 60}분 ${seconds}초`;
+        }
+        display.style.setProperty('--timer-fit', fit);
+        display.setAttribute('aria-label', label);
+        parts.total = total;
+    }
+    setText(parts.fraction, pad(Math.floor(valueMs / 10) % 100));
 }
 
-function wholeTime(total, unit = text => text) {
+function clockTime(total) {
+    return [Math.floor(total / 3600) % 24, Math.floor(total / 60) % 60, total % 60].map(pad).join(':');
+}
+
+function wholeTime(total) {
     const days = Math.floor(total / 86400);
-    const time = [Math.floor(total / 3600) % 24, Math.floor(total / 60) % 60, total % 60].map(pad).join(':');
-    return `${days ? `${days}${unit('일')} ` : ''}${time}`;
+    return `${days ? `${days}일 ` : ''}${clockTime(total)}`;
 }
 
 function updateTimerFrame(current, reading) {
     const display = el('timer-display');
     if (!reading) {
-        display.textContent = '–:––:––';
+        setText(display, '–:––:––');
+        display.setAttribute('aria-label', current.connection === 'connecting' ? '시간 불러오는 중' : '시간 정보 없음');
+        display.style.removeProperty('--timer-fit');
         display.classList.remove('finished');
         show('timer-info', false);
+        current.displayParts = undefined;
         current.lastStatus = undefined;
         return;
     }
     const timer = current.timer;
-    const markup = renderTime(reading.valueMs);
-    if (current.markup !== markup) {
-        display.innerHTML = markup;
-        current.markup = markup;
-    }
+    renderTime(current, display, reading.valueMs);
     if (current.lastStatus !== reading.status || current.endAt !== reading.endAt || current.startedAt !== timer.startedAt) {
         display.classList.toggle('finished', reading.status === 'finished');
         const hasClockInfo = reading.endAt || (!isCountdown(timer) && timer.startedAt);
@@ -504,38 +561,42 @@ function saveLiveBookmark(timer) {
     return write('liveTimers', [timer, ...list]);
 }
 
-function listItem(timer, live) {
-    const item = document.createElement('div');
-    item.className = 'timer-list-item';
-    const link = document.createElement('a');
-    link.className = 'timer-list-info';
+function setRemovalConfirmation(button, confirming) {
+    button.classList.toggle('confirming', confirming);
+    button.setAttribute('aria-label', confirming ? '삭제 확인' : '목록에서 삭제');
+}
+
+function listItem(timer, live, index) {
+    const item = el('timer-list-item-template').content.firstElementChild.cloneNode(true);
+    const link = item.querySelector('.timer-list-info');
+    const name = item.querySelector('.timer-list-name');
+    const label = item.querySelector('.timer-list-type');
+    const time = item.querySelector('.timer-list-time');
+    const remove = item.querySelector('.timer-list-btn');
+    const stopwatch = timer.type === 'stopwatch' || timer.mode === 'immediate' || timer.mode === 'scheduled';
     link.href = live ? timer.hash : `#/${timer.id}`;
-    const name = document.createElement('div');
-    name.className = 'timer-list-name';
-    name.textContent = timer.name || modeNames[timer.mode] || (timer.type === 'stopwatch' ? '스톱워치' : '타이머');
-    link.append(name);
-    if (!live) {
-        const time = document.createElement('div');
-        time.className = 'timer-list-time';
-        item.dataset.localId = timer.id;
-        link.append(time);
-    }
-    const label = document.createElement('div');
-    label.className = 'timer-list-type';
-    label.textContent = live ? `${modeNames[timer.mode]} · ${timer.mode === 'deadline' ? '관리' : '조작'} 링크` : '이 기기에서만 실행';
-    link.append(label);
-    const remove = document.createElement('button');
-    remove.className = 'timer-list-btn delete';
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', '목록에서 삭제');
+    name.id = `saved-timer-name-${index}`;
+    name.textContent = timer.name || modeNames[timer.mode] || (stopwatch ? '스톱워치' : '타이머');
+    label.textContent = live ? `${modeNames[timer.mode] || '타이머'} · ${timer.mode === 'deadline' ? '관리' : '조작'} 링크` : '이 기기에서만 실행';
+    time.hidden = live;
+    if (!live) item.dataset.localId = timer.id;
+    if (stopwatch) item.querySelector('.saved-item-icon use').setAttribute('href', '#icon-stopwatch');
+    remove.setAttribute('aria-describedby', name.id);
+
+    remove.addEventListener('blur', event => {
+        // WebKit can blur the button without a new focus target before delivering its tap.
+        if (event.relatedTarget) setRemovalConfirmation(remove, false);
+    });
+    remove.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && remove.classList.contains('confirming')) {
+            event.preventDefault();
+            setRemovalConfirmation(remove, false);
+        }
+    });
     remove.addEventListener('click', () => {
         if (!remove.classList.contains('confirming')) {
-            remove.classList.add('confirming');
-            remove.textContent = '삭제';
-            setTimeout(() => {
-                remove.classList.remove('confirming');
-                remove.textContent = '×';
-            }, 3000);
+            setRemovalConfirmation(remove, true);
+            remove.focus({ preventScroll: true });
             return;
         }
         const key = live ? 'liveTimers' : 'timerList';
@@ -544,9 +605,11 @@ function listItem(timer, live) {
                 try { localStorage.removeItem(`timer_state_${timer.id}`); } catch { /* The list entry is already removed. */ }
             }
             renderLists();
+            const rows = el('timer-list-container').children;
+            const next = rows[Math.min(index, rows.length - 1)]?.querySelector('.timer-list-info');
+            (next ?? el('saved-title')).focus();
         }
     });
-    item.append(link, remove);
     return item;
 }
 
@@ -554,8 +617,13 @@ let listUpdatedAt = -1;
 function renderLists() {
     const live = getList('liveTimers').filter(item => typeof item.hash === 'string' && item.hash.startsWith('#/live/') && parseLiveHash(item.hash));
     const local = getList('timerList').filter(item => /^[a-zA-Z0-9_-]{1,80}$/.test(item.id));
-    el('timer-list-container').replaceChildren(...live.map(item => listItem(item, true)), ...local.map(item => listItem(item, false)));
-    show('timer-list-section', Boolean(live.length + local.length));
+    el('timer-list-container').replaceChildren(
+        ...live.map((item, index) => listItem(item, true, index)),
+        ...local.map((item, index) => listItem(item, false, live.length + index))
+    );
+    const hasTimers = Boolean(live.length + local.length);
+    show('timer-list-container', hasTimers);
+    show('timer-list-empty', !hasTimers);
     listUpdatedAt = -1;
 }
 
@@ -576,7 +644,8 @@ function updateList() {
 function updateAlarmButton() {
     const enabled = Boolean(audio && audio.state === 'running');
     el('alarm-btn').setAttribute('aria-pressed', enabled);
-    setText(el('alarm-btn'), enabled ? '종료 알림 끄기' : '종료 알림 켜기');
+    el('alarm-icon').setAttribute('href', enabled ? '#icon-bell-off' : '#icon-bell');
+    setText(el('alarm-label'), enabled ? '종료 알림 끄기' : '종료 알림 켜기');
 }
 
 async function toggleAlarm() {
@@ -741,11 +810,13 @@ el('mode-duration').onclick = () => { countdownMode = 'duration'; updateForm(); 
 el('mode-target').onclick = () => { countdownMode = 'deadline'; updateForm(); };
 el('sw-mode-immediate').onclick = () => { stopwatchMode = 'immediate'; updateForm(); };
 el('sw-mode-target').onclick = () => { stopwatchMode = 'scheduled'; updateForm(); };
+el('duration-input-group').addEventListener('input', updatePresetSelection);
 for (const button of document.querySelectorAll('[data-minutes]')) {
     button.addEventListener('click', () => {
         el('countdown-hours').value = 0;
         el('countdown-minutes').value = button.dataset.minutes;
         el('countdown-seconds').value = 0;
+        updatePresetSelection();
     });
 }
 el('create-form').onsubmit = event => {
@@ -756,6 +827,10 @@ el('create-form').onsubmit = event => {
         setText(el('create-status'), message(error, '타이머 설정을 확인하세요.'));
     }
 };
+el('landing-view').addEventListener('pointerdown', event => {
+    const pending = el('timer-list-container').querySelector('.confirming');
+    if (pending && !pending.contains(event.target)) setRemovalConfirmation(pending, false);
+});
 el('back-to-home').onclick = () => { window.location.hash = ''; };
 el('retry-btn').onclick = openRoute;
 el('reset-btn').onclick = () => performCommand({ type: 'reset' });
@@ -765,17 +840,24 @@ el('change-target-btn').onclick = () => {
     session.targetEditRevision = session.timer.revision;
     fillDate('new-target', session.timer.targetAt > 0 ? session.timer.targetAt : nextWholeHour(nowFor(session)));
     setText(el('target-feedback'), '');
+    el('change-target-btn').focus({ preventScroll: true });
     el('change-target-modal').showModal();
 };
 el('cancel-change-btn').onclick = () => el('change-target-modal').close();
-el('confirm-change-btn').onclick = async () => {
+el('change-target-form').onsubmit = async event => {
+    event.preventDefault();
+    const current = session;
+    const dialog = el('change-target-modal');
     const status = el('target-feedback');
     const button = el('confirm-change-btn');
+    if (button.disabled) return;
     button.disabled = true;
     try {
         const targetAt = dateFromFields('new-target');
-        if (await performCommand({ type: 'setDeadline', targetAt }, status, session?.targetEditRevision)) el('change-target-modal').close();
-        else if (session?.isLive && !session.online) setText(status, '연결이 복구된 뒤 다시 적용하세요.');
+        const applied = await performCommand({ type: 'setDeadline', targetAt }, status, current?.targetEditRevision);
+        if (session !== current || !dialog.open) return;
+        if (applied) dialog.close();
+        else if (current?.isLive && !current.online) setText(status, '연결이 복구된 뒤 다시 적용하세요.');
     } catch (error) {
         setText(status, message(error, errors.invalidDate));
     } finally {
@@ -784,7 +866,6 @@ el('confirm-change-btn').onclick = async () => {
 };
 el('share-btn').onclick = () => copyLink(false);
 el('control-link-btn').onclick = () => copyLink(true);
-el('close-copy').onclick = () => el('copy-dialog').close();
 el('promote-btn').onclick = () => {
     const settings = settingsFromLegacy(session.timer, Date.now());
     const status = el('timer-feedback');
@@ -794,12 +875,16 @@ el('promote-btn').onclick = () => {
 el('fullscreen-btn').onclick = async () => {
     try {
         if (document.fullscreenElement) await document.exitFullscreen();
-        else await el('timer-view').requestFullscreen();
+        else await el('app').requestFullscreen();
     } catch {
         setText(el('timer-feedback'), '이 화면에서 전체 화면을 열 수 없습니다.');
     }
 };
-document.addEventListener('fullscreenchange', () => setText(el('fullscreen-btn'), document.fullscreenElement ? '전체 화면 닫기' : '전체 화면'));
+document.addEventListener('fullscreenchange', () => {
+    const fullscreen = document.fullscreenElement === el('app');
+    el('fullscreen-icon').setAttribute('href', fullscreen ? '#icon-minimize' : '#icon-maximize');
+    setText(el('fullscreen-label'), fullscreen ? '전체 화면 닫기' : '전체 화면');
+});
 el('alarm-btn').onclick = toggleAlarm;
 for (const mode of displayModes) {
     el(`mode-${mode}-btn`).onclick = () => {
@@ -813,7 +898,12 @@ el('theme-toggle').onclick = () => {
     write('theme', next);
 };
 colors.addEventListener('change', () => setTheme(preferredTheme()));
-window.addEventListener('hashchange', openRoute);
+window.addEventListener('hashchange', () => {
+    openRoute();
+    window.scrollTo(0, 0);
+    if (document.fullscreenElement === el('app')) el('app').scrollTop = 0;
+    el(window.location.hash ? 'timer-name-display' : 'landing-title').focus({ preventScroll: true });
+});
 window.addEventListener('offline', () => {
     if (!session?.isLive) return;
     session.online = false;
