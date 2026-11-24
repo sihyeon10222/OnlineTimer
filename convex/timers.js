@@ -1,7 +1,8 @@
 import { mutationGeneric as mutation, queryGeneric as query } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
-import { ACCESS_KEY, MAX_DURATION_MS, ROOM_ID, createTimerState, isDateTime, transitionTimer } from '../timer-model.js';
+import { ACCESS_KEY, MAX_DURATION_MS, ROOM_ID, SHARE_CODE, createTimerState, isDateTime, transitionTimer } from '../timer-model.js';
 import { mode, phase } from './schema.js';
+import { decodeSnapshot } from '../legacy.js';
 
 const access = { roomId: v.string(), key: v.string() };
 
@@ -14,16 +15,80 @@ function publicTimer(timer) {
     return { roomId, revision, name, mode, durationMs, targetAt, phase, valueMs, anchorAt, startedAt };
 }
 
+async function digest(value) {
+    return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+}
+
 async function hashKey(key) {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
-    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    return Array.from(await digest(key), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function shareByHash(ctx, codeHash) {
+    return ctx.db.query('shareLinks').withIndex('by_code', index => index.eq('codeHash', codeHash)).unique();
 }
 
 async function matchingTimer(ctx, { roomId, key }) {
-    if (!ROOM_ID.test(roomId) || !ACCESS_KEY.test(key)) return null;
+    if (!ROOM_ID.test(roomId)) return null;
+    if (SHARE_CODE.test(key)) {
+        const link = await shareByHash(ctx, await hashKey(key));
+        const target = link?.target;
+        return target?.roomId === roomId && (target.role === 'control' || target.role === 'manage')
+            ? findTimer(ctx, roomId)
+            : null;
+    }
+
+    if (!ACCESS_KEY.test(key)) return null;
     const timer = await findTimer(ctx, roomId);
     return timer && timer.accessHash === await hashKey(key) ? timer : null;
 }
+
+function privateRole(timer) {
+    return timer.mode === 'deadline' ? 'manage' : 'control';
+}
+
+async function saveShare(ctx, target, seed) {
+    const bytes = (await digest(seed)).subarray(0, 16);
+    const code = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const codeHash = await hashKey(code);
+    const existing = await shareByHash(ctx, codeHash);
+    if (!existing) await ctx.db.insert('shareLinks', { codeHash, target });
+    else if (existing.target.role !== target.role || existing.target.roomId !== target.roomId
+        || existing.target.snapshot !== target.snapshot) throw new ConvexError('collision');
+    return code;
+}
+
+export const share = mutation({
+    args: {
+        destination: v.union(
+            v.object({ roomId: v.string(), key: v.optional(v.string()) }),
+            v.object({ snapshot: v.string(), nonce: v.string() })
+        )
+    },
+    handler: async (ctx, { destination }) => {
+        if ('snapshot' in destination) {
+            const { snapshot, nonce } = destination;
+            if (!ROOM_ID.test(nonce) || !decodeSnapshot(snapshot, Date.now())) throw new ConvexError('invalid');
+            return saveShare(ctx, { role: 'snapshot', snapshot }, `share:snapshot:${nonce}:${snapshot}`);
+        }
+
+        const { roomId, key } = destination;
+        if (!ROOM_ID.test(roomId)) throw new ConvexError('invalid');
+        const timer = key === undefined ? await findTimer(ctx, roomId) : await matchingTimer(ctx, { roomId, key });
+        if (!timer) throw new ConvexError('forbidden');
+
+        if (key && SHARE_CODE.test(key)) return key;
+        const role = key ? privateRole(timer) : 'view';
+        return saveShare(ctx, { role, roomId }, `share:${role}:${roomId}:${key ?? ''}`);
+    }
+});
+
+export const resolveShare = query({
+    args: { code: v.string() },
+    handler: async (ctx, { code }) => {
+        if (!SHARE_CODE.test(code)) return null;
+        return (await shareByHash(ctx, await hashKey(code)))?.target ?? null;
+    }
+});
 
 export const get = query({
     args: { roomId: v.string() },
@@ -37,7 +102,7 @@ export const authorize = query({
     args: access,
     handler: async (ctx, args) => {
         const timer = await matchingTimer(ctx, args);
-        return timer ? (timer.mode === 'deadline' ? 'manage' : 'control') : null;
+        return timer ? privateRole(timer) : null;
     }
 });
 

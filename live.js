@@ -1,12 +1,14 @@
 import { ConvexClient, ConvexHttpClient } from 'convex/browser';
 import { makeFunctionReference } from 'convex/server';
-import { ACCESS_KEY, ROOM_ID, randomHex } from './timer-model.js';
+import { ACCESS_KEY, ROOM_ID, SHARE_CODE, randomHex } from './timer-model.js';
 
 const api = {
     get: makeFunctionReference('timers:get'),
     create: makeFunctionReference('timers:create'),
     apply: makeFunctionReference('timers:apply'),
     authorize: makeFunctionReference('timers:authorize'),
+    share: makeFunctionReference('timers:share'),
+    resolveShare: makeFunctionReference('timers:resolveShare'),
     clock: makeFunctionReference('timers:clock')
 };
 
@@ -33,6 +35,23 @@ export function parseLiveHash(hash) {
 export function liveHash(roomId, role, key) {
     const view = `#/live/${roomId}`;
     return key ? `${view}/${role}/${key}` : view;
+}
+
+export function shareHash(code) {
+    return `#s/${code}`;
+}
+
+export function parseShareHash(hash) {
+    const code = hash.slice(3);
+    return hash.startsWith('#s/') && SHARE_CODE.test(code) ? code : null;
+}
+
+export function createShareLink(destination) {
+    return http().mutation(api.share, { destination });
+}
+
+export function resolveShareLink(code) {
+    return http().query(api.resolveShare, { code });
 }
 
 export function createLiveTimer(args) {

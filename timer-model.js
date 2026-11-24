@@ -75,3 +75,4 @@ export function randomHex(byteCount) {
 
 export const ROOM_ID = /^[0-9a-f]{32}$/;
 export const ACCESS_KEY = /^[0-9a-f]{64}$/;
+export const SHARE_CODE = /^[A-Za-z0-9_-]{22}$/;

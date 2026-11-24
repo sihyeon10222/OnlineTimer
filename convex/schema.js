@@ -17,5 +17,15 @@ export default defineSchema({
         valueMs: v.number(),
         anchorAt: v.number(),
         startedAt: v.number()
-    }).index('by_room', ['roomId'])
+    }).index('by_room', ['roomId']),
+    shareLinks: defineTable({
+        codeHash: v.string(),
+        target: v.union(
+            v.object({ role: v.literal('snapshot'), snapshot: v.string() }),
+            v.object({
+                role: v.union(v.literal('view'), v.literal('control'), v.literal('manage')),
+                roomId: v.string()
+            })
+        )
+    }).index('by_code', ['codeHash'])
 });

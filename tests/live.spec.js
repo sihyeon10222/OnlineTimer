@@ -17,6 +17,18 @@ function viewLink(url) {
     return address.href;
 }
 
+async function copiedShortLink(page, button, original) {
+    await page.bringToFront();
+    await page.evaluate(() => navigator.clipboard.writeText(''));
+    await page.locator(button).click();
+    const read = () => page.evaluate(() => navigator.clipboard.readText());
+    await expect.poll(read).toMatch(/#s\/[A-Za-z0-9_-]{22}$/);
+    const url = await read();
+    expect(url.length).toBeLessThan(original.length);
+    expect(new URL(url).search).toBe('');
+    return url;
+}
+
 async function localDateInput(page, prefix, timestamp) {
     const date = new Date(timestamp);
     const day = [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()].map(x => String(x).padStart(2, '0')).join('-');
@@ -68,11 +80,9 @@ test('two browser contexts share countdown, reconnect, reopen and keep running w
         expect(actualAddress.searchParams.get('source')).toBe('verification');
         actualAddress.search = '';
         const controlUrl = actualAddress.href;
-        const viewUrl = viewLink(controlUrl);
-        await controller.locator('#share-btn').click();
-        await expect.poll(() => controller.evaluate(() => navigator.clipboard.readText())).toBe(viewUrl);
-        await controller.locator('#control-link-btn').click();
-        await expect.poll(() => controller.evaluate(() => navigator.clipboard.readText())).toBe(controlUrl);
+        const shortControlUrl = await copiedShortLink(controller, '#control-link-btn', controlUrl);
+        const viewUrl = await copiedShortLink(controller, '#share-btn', viewLink(controlUrl));
+        expect(viewUrl).not.toBe(shortControlUrl);
         await viewer.goto(viewUrl);
         await expect(liveStatus(viewer)).toContainText('보기 전용');
         await expect(viewer.locator('#timer-name-display')).toHaveText('함께 보는 타이머');
@@ -105,7 +115,7 @@ test('two browser contexts share countdown, reconnect, reopen and keep running w
         await expect(liveStatus(controller)).toContainText('연결 끊김');
         await expect(controller.getByRole('button', { name: '다시 시작' })).toBeDisabled();
         const remoteController = await viewerContext.newPage();
-        await remoteController.goto(controlUrl);
+        await remoteController.goto(shortControlUrl);
         await expect(liveStatus(remoteController)).toHaveText('실시간 연결됨');
         await remoteController.getByRole('button', { name: '초기화' }).click();
         await expect(label(viewer)).toContainText('시작 전');
@@ -125,7 +135,7 @@ test('two browser contexts share countdown, reconnect, reopen and keep running w
         await reopened.goto(baseURL);
         await reopened.getByRole('link', { name: /함께 보는 타이머/ }).click();
         await expect(liveStatus(reopened)).toHaveText('실시간 연결됨');
-        await reopened.goto(viewUrl);
+        await reopened.goto(viewLink(controlUrl));
         await expect(liveStatus(reopened)).toContainText('보기 전용');
         await expect(reopened.locator('#controls')).toBeHidden();
     } finally {
@@ -135,7 +145,7 @@ test('two browser contexts share countdown, reconnect, reopen and keep running w
 });
 
 test('private deadline link works on another device and viewers only receive the changed deadline', async ({ browser, baseURL }) => {
-    const creatorContext = await browser.newContext({ timezoneId: 'UTC' });
+    const creatorContext = await browser.newContext({ timezoneId: 'UTC', permissions: ['clipboard-read', 'clipboard-write'] });
     const otherContext = await browser.newContext({ timezoneId: 'UTC', isMobile: true, viewport: { width: 390, height: 844 } });
     try {
         const creator = await creatorContext.newPage();
@@ -151,7 +161,8 @@ test('private deadline link works on another device and viewers only receive the
         await viewer.goto(viewLink(manageUrl));
         await expect(liveStatus(viewer)).toContainText('보기 전용');
         await expect(viewer.locator('#change-target-btn')).toBeHidden();
-        await manager.goto(manageUrl);
+        const shortManageUrl = await copiedShortLink(creator, '#control-link-btn', manageUrl);
+        await manager.goto(shortManageUrl);
         await expect(liveStatus(manager)).toHaveText('실시간 연결됨');
         await expect(manager.locator('#toggle-btn')).toBeHidden();
         await expect(manager.locator('#reset-btn')).toBeHidden();
@@ -199,6 +210,18 @@ test('server validates links and applies only one command per revision', async (
         roomId, key: id(32), expectedRevision: 0, command: { type: 'start' }
     })).rejects.toThrow('forbidden');
 
+    const [viewCode, duplicateView, controlCode] = await Promise.all([
+        backend.mutation(fn('share'), { destination: { roomId } }, { skipQueue: true }),
+        backend.mutation(fn('share'), { destination: { roomId } }, { skipQueue: true }),
+        backend.mutation(fn('share'), { destination: { roomId, key } }, { skipQueue: true })
+    ]);
+    expect(viewCode).toBe(duplicateView);
+    expect(viewCode).not.toBe(controlCode);
+    expect(await backend.query(fn('resolveShare'), { code: controlCode })).toEqual({ roomId, role: 'control' });
+    expect(await backend.query(fn('authorize'), { roomId, key: controlCode })).toBe('control');
+    expect(await backend.query(fn('authorize'), { roomId, key: viewCode })).toBeNull();
+    await expect(backend.mutation(fn('share'), { destination: { roomId, key: viewCode } })).rejects.toThrow('forbidden');
+
     const commands = [{ type: 'start' }, { type: 'restart' }];
     const results = await Promise.all(commands.map(command =>
         backend.mutation(fn('apply'), { roomId, key, expectedRevision: 0, command }, { skipQueue: true })));
@@ -228,7 +251,12 @@ test('existing local history and snapshot links can open and create a live copy'
     await expect(liveStatus(page)).toHaveText('실시간 연결됨');
     await expect(label(page)).toContainText('일시정지');
     await expect(display(page)).toHaveText('00:00:1700');
-    await page.goto(new URL('#*,O0,,,,%ED%83%80%EC%9D%B4%EB%A8%B8', baseURL).href);
+    const snapshot = new URL('#*,O0,,,,%ED%83%80%EC%9D%B4%EB%A8%B8', baseURL).href;
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto(snapshot);
+    await expect(liveStatus(page)).toContainText('이 기기에서만');
+    const shortSnapshot = await copiedShortLink(page, '#share-btn', snapshot);
+    await page.goto(shortSnapshot);
     await expect(liveStatus(page)).toContainText('이 기기에서만');
     await expect(page.locator('#timer-name-display')).toHaveText('타이머');
 });

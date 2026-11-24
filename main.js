@@ -1,8 +1,8 @@
 import { MAX_DURATION_MS, isCountdown, isDateTime, randomHex, timerReading, transitionTimer } from './timer-model.js';
 import { decodeSnapshot, encodeSnapshot, normalizeLegacy, settingsFromLegacy, toLegacy } from './legacy.js';
 import {
-    authorizeLiveTimer, changeLiveTimer, createLiveTimer, getLiveTimer,
-    liveHash, measureServerClock, parseLiveHash, watchLiveTimer
+    authorizeLiveTimer, changeLiveTimer, createLiveTimer, createShareLink, getLiveTimer,
+    liveHash, measureServerClock, parseLiveHash, parseShareHash, resolveShareLink, shareHash, watchLiveTimer
 } from './live.js';
 
 const el = id => document.getElementById(id);
@@ -224,20 +224,13 @@ function openRoute() {
 
     const current = { hash, timer: null, busy: false, online: false, role: 'view', onScreen: true };
     session = current;
+    const code = parseShareHash(hash);
     const route = hash.startsWith('#/live/') ? parseLiveHash(hash) : null;
-    if (route) {
-        Object.assign(current, route, { isLive: true, connection: 'connecting' });
-        try {
-            current.stop = watchLiveTimer(current.roomId, timer => {
-                if (session === current) acceptSnapshot(current, timer);
-            }, connected => {
-                if (session === current) updateConnection(current, connected);
-            }, error => {
-                if (session === current) connectionError(current, error);
-            });
-        } catch (error) {
-            connectionError(current, error);
-        }
+    if (code) {
+        Object.assign(current, { isLive: true, connection: 'connecting' });
+        void openShortLink(current, code);
+    } else if (route) {
+        watchRoute(current, route);
     } else {
         const legacy = readLegacyHash(hash);
         Object.assign(current, { timer: legacy.timer, legacyId: legacy.id, role: 'local' });
@@ -245,6 +238,42 @@ function openRoute() {
         if (!current.timer) current.connection = 'missing';
     }
     render();
+}
+
+function watchRoute(current, route) {
+    Object.assign(current, route, { isLive: true, connection: 'connecting' });
+    try {
+        current.stop = watchLiveTimer(current.roomId, timer => {
+            if (session === current) acceptSnapshot(current, timer);
+        }, connected => {
+            if (session === current) updateConnection(current, connected);
+        }, error => {
+            if (session === current) connectionError(current, error);
+        });
+    } catch (error) {
+        connectionError(current, error);
+    }
+}
+
+async function openShortLink(current, code) {
+    try {
+        const target = await resolveShareLink(code);
+        if (session !== current) return;
+        if (!target) {
+            current.connection = 'missing';
+        } else if (target.role === 'snapshot') {
+            const timer = decodeSnapshot(target.snapshot, Date.now());
+            Object.assign(current, { timer, isLive: false, role: 'local', connection: timer ? undefined : 'missing' });
+            if (timer) current.snapshotShare = { snapshot: encodeSnapshot(timer), code };
+        } else {
+            const { roomId, role } = target;
+            watchRoute(current, { roomId, role, key: role === 'view' ? undefined : code });
+            if (role === 'view') current.viewShare = code;
+        }
+        render();
+    } catch (error) {
+        if (session === current) connectionError(current, error);
+    }
 }
 
 function acceptSnapshot(current, timer) {
@@ -599,17 +628,80 @@ function handleAlarm(current, reading) {
     }
 }
 
-async function copyLink(hash, privateLink = false) {
+function shareUrl(hash) {
     const url = new URL(window.location.pathname, window.location.origin);
     url.hash = hash;
+    return url.href;
+}
+
+async function linkForCopy(current, privateLink) {
+    const direct = privateLink ? current.hash : current.isLive ? liveHash(current.roomId) : encodeSnapshot(current.timer);
     try {
-        await navigator.clipboard.writeText(url.href);
-        setText(el('timer-feedback'), privateLink ? '복사했습니다. 이 링크를 가진 사람에게 조작 권한이 있습니다.' : '링크를 복사했습니다.');
+        if (current.isLive) {
+            const code = privateLink
+                ? current.privateShare ?? parseShareHash(current.hash)
+                : current.viewShare;
+            if (code) return { url: shareUrl(shareHash(code)) };
+
+            const destination = { roomId: current.roomId };
+            if (privateLink) destination.key = current.key;
+            const created = await createShareLink(destination);
+            if (privateLink) current.privateShare = created;
+            else current.viewShare = created;
+            return { url: shareUrl(shareHash(created)) };
+        }
+
+        if (direct.length <= shareHash('').length + 22) return { url: shareUrl(direct) };
+        const snapshot = direct.slice(2);
+        if (current.snapshotShare?.snapshot !== snapshot) current.snapshotShare = { snapshot, nonce: randomHex(16) };
+        const saved = current.snapshotShare;
+        saved.code ??= await createShareLink({ snapshot, nonce: saved.nonce });
+        return { url: shareUrl(shareHash(saved.code)) };
     } catch {
-        el('copy-title').textContent = privateLink ? '조작 또는 관리 링크 복사' : '보기 링크 복사';
-        el('copy-value').value = url.href;
-        el('copy-dialog').showModal();
-        el('copy-value').select();
+        return { url: shareUrl(direct), fallback: true };
+    }
+}
+
+async function copyLink(privateLink) {
+    const current = session;
+    if (!current?.timer || current.copying) return;
+    current.copying = true;
+    const feedback = el('timer-feedback');
+    setText(feedback, '공유 링크를 준비하고 있습니다.');
+    const link = linkForCopy(current, privateLink);
+    try {
+        let copied = false;
+        try {
+            if (navigator.clipboard?.write && window.ClipboardItem) {
+                // Reserve clipboard access during the click while the short link is generated.
+                const data = link.then(({ url }) => new Blob([url], { type: 'text/plain' }));
+                await navigator.clipboard.write([new ClipboardItem({ 'text/plain': data })]);
+            } else {
+                await navigator.clipboard.writeText((await link).url);
+            }
+            copied = true;
+        } catch {
+            // The dialog still allows copying if the browser denies clipboard access.
+        }
+
+        const { url, fallback } = await link;
+        if (session !== current) return;
+        const access = privateLink ? '이 링크를 가진 사람에게 조작 권한이 있습니다.' : '';
+        if (!copied) {
+            setText(el('copy-title'), privateLink ? el('control-link-label').textContent : el('share-label').textContent);
+            setText(el('copy-description'), access ? `아래 링크를 선택해 복사하세요. ${access}` : '아래 링크를 선택해 복사하세요.');
+            el('copy-value').value = url;
+            el(privateLink ? 'control-link-btn' : 'share-btn').focus({ preventScroll: true });
+            el('copy-dialog').showModal();
+            el('copy-value').select();
+        }
+        const result = copied ? '링크를 복사했습니다.' : '';
+        const original = fallback ? '짧은 링크를 만들 수 없어 원래 주소를 사용합니다.' : '';
+        setText(feedback, [result, original, copied && access].filter(Boolean).join(' '));
+    } catch {
+        if (session === current) setText(feedback, '공유 링크를 만들 수 없습니다. 다시 시도하세요.');
+    } finally {
+        current.copying = false;
     }
 }
 
@@ -690,8 +782,8 @@ el('confirm-change-btn').onclick = async () => {
         button.disabled = false;
     }
 };
-el('share-btn').onclick = () => copyLink(session.isLive ? liveHash(session.roomId) : encodeSnapshot(session.timer));
-el('control-link-btn').onclick = () => copyLink(session.hash, true);
+el('share-btn').onclick = () => copyLink(false);
+el('control-link-btn').onclick = () => copyLink(true);
 el('close-copy').onclick = () => el('copy-dialog').close();
 el('promote-btn').onclick = () => {
     const settings = settingsFromLegacy(session.timer, Date.now());
