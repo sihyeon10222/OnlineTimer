@@ -418,24 +418,29 @@ function render() {
     updateTimerFrame(current, reading);
 }
 
-const fullscreenClockObserver = new ResizeObserver(([{ target: clock }]) => {
-    requestAnimationFrame(() => {
-        if (!clock.isConnected || document.fullscreenElement !== el('app')) return;
+let clockFitFrame;
+const clockFitObserver = new ResizeObserver(() => {
+    if (clockFitFrame !== undefined) return;
+    clockFitFrame = requestAnimationFrame(() => {
+        clockFitFrame = undefined;
+        const display = el('timer-display');
+        const clock = display.querySelector('.timer-clock');
+        if (!clock) return;
+        const available = display.getBoundingClientRect();
+        const rendered = clock.getBoundingClientRect();
+        if (!rendered.width || !rendered.height) return;
+
+        // Compare sizes in rendered coordinates so scaling affects both measurements alike.
+        const widthRatio = available.width * 0.88 / rendered.width;
+        const heightRatio = document.fullscreenElement === el('app') ? available.height * 0.8 / rendered.height : Infinity;
         const fontSize = parseFloat(getComputedStyle(clock).fontSize);
-        if (!fontSize) return;
-        const fit = Math.ceil(clock.getBoundingClientRect().width / fontSize * 100) / 100;
-        const previous = Number(clock.style.getPropertyValue('--clock-width-in-em'));
-        if (fit && Math.abs(fit - previous) > 0.02) {
-            clock.style.setProperty('--clock-width-in-em', fit);
+        const fit = Math.floor(fontSize * Math.min(widthRatio, heightRatio) * 100) / 100;
+        const previous = parseFloat(clock.style.getPropertyValue('--clock-fit-size'));
+        if (fit > 0 && !(Math.abs(fit - previous) < 0.1)) {
+            clock.style.setProperty('--clock-fit-size', `${fit}px`);
         }
     });
 });
-
-function observeFullscreenClock() {
-    fullscreenClockObserver.disconnect();
-    const clock = el('timer-display').querySelector('.timer-clock');
-    if (clock && document.fullscreenElement === el('app')) fullscreenClockObserver.observe(clock);
-}
 
 function renderTime(current, display, valueMs) {
     const total = Math.floor(valueMs / 1000);
@@ -451,12 +456,15 @@ function renderTime(current, display, valueMs) {
         display.innerHTML = `<span class="timer-clock" aria-hidden="true">${dayMarkup}${minutesMarkup}<span class="timer-clock-part"><span data-time></span><span class="timer-ms" data-fraction></span>${secondsUnit}</span></span>`;
         parts = current.displayParts = {
             mode: displayMode, showDays,
+            clock: display.firstElementChild,
             days: display.querySelector('[data-days]'),
             minutes: display.querySelector('[data-minutes]'),
             time: display.querySelector('[data-time]'),
             fraction: display.querySelector('[data-fraction]')
         };
-        observeFullscreenClock();
+        clockFitObserver.disconnect();
+        clockFitObserver.observe(display);
+        clockFitObserver.observe(parts.clock);
     }
 
     if (parts.total !== total) {
@@ -486,7 +494,11 @@ function renderTime(current, display, valueMs) {
             setText(parts.time, clockTime(total));
             label = `${days ? `${days}일 ` : ''}${hours}시간 ${minutes % 60}분 ${seconds}초`;
         }
-        display.style.setProperty('--timer-fit', fit);
+        if (parts.fit !== fit) {
+            parts.clock.style.removeProperty('--clock-fit-size');
+            display.style.setProperty('--timer-fit', fit);
+            parts.fit = fit;
+        }
         display.setAttribute('aria-label', label);
         parts.total = total;
     }
@@ -510,6 +522,7 @@ function updateTimerFrame(current, reading) {
         display.style.removeProperty('--timer-fit');
         display.classList.remove('finished');
         show('timer-info', false);
+        clockFitObserver.disconnect();
         current.displayParts = undefined;
         current.lastStatus = undefined;
         return;
@@ -912,7 +925,6 @@ document.addEventListener('fullscreenchange', () => {
     const fullscreen = document.fullscreenElement === el('app');
     el('fullscreen-icon').setAttribute('href', fullscreen ? '#icon-minimize' : '#icon-maximize');
     setActionLabel('fullscreen-btn', 'fullscreen-label', fullscreen ? '전체 화면 닫기' : '전체 화면');
-    observeFullscreenClock();
 });
 el('alarm-btn').onclick = toggleAlarm;
 for (const mode of displayModes) {

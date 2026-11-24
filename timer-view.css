@@ -180,7 +180,11 @@
 }
 
 .timer-display {
+    --clock-height-limit: min(8.625rem, 17cqi);
+
+    container-type: inline-size;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     align-content: center;
     gap: .2em;
@@ -189,7 +193,7 @@
     min-block-size: clamp(5rem, 18vw, 11.5rem);
     color: var(--text);
     font-size: clamp(1.5rem, 9vw, 8.625rem);
-    font-size: min(8.625rem, 17cqi, calc(95cqi / var(--timer-fit, 5.5)));
+    font-size: var(--clock-height-limit);
     font-weight: 760;
     font-variant-numeric: tabular-nums;
     letter-spacing: -.028em;
@@ -200,17 +204,19 @@
     color: var(--danger);
 }
 
+/* Measure the entire row at its natural width, including the fraction and units. */
 .timer-clock {
     display: flex;
+    inline-size: max-content;
+    font-size: min(var(--clock-height-limit), var(--clock-fit-size, calc(75cqi / var(--timer-fit, 5.5))));
     white-space: nowrap;
     align-items: baseline;
     justify-content: center;
-    gap: .125em .22em;
-    max-inline-size: 100%;
+    gap: .22em;
 }
 
 .timer-clock-part {
-    max-inline-size: 100%;
+    flex: none;
 }
 
 .timer-ms, .timer-unit {
@@ -302,7 +308,7 @@
 
     .timer-display {
         min-block-size: clamp(3.5rem, 20dvh, 6rem);
-        font-size: min(16dvh, 17cqi, calc(95cqi / var(--timer-fit, 5.5)));
+        --clock-height-limit: min(16dvh, 17cqi);
     }
 }
 
@@ -379,22 +385,12 @@
 }
 
 #app:fullscreen .timer-display {
+    --clock-height-limit: 80cqb;
+
     container-type: size;
     flex: 1 0 1rem;
     min-block-size: 0;
     font-size: 1rem;
-}
-
-/* Keep the row intrinsic so its measured width includes every glyph and gap. */
-#app:fullscreen .timer-clock {
-    inline-size: max-content;
-    max-inline-size: none;
-    font-size: min(90cqb, calc(95cqi / var(--clock-width-in-em, 1.2 * var(--timer-fit, 5.5))));
-}
-
-#app:fullscreen .timer-clock-part {
-    flex: none;
-    max-inline-size: none;
 }
 
 #app:fullscreen :is(#retry-btn, .timer-body > .feedback) {

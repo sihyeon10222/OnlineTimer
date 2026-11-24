@@ -201,20 +201,40 @@ test.describe('saved timers on touch', () => {
     });
 });
 
-test('fullscreen clock and controls stay within the available area after resizing', async ({ page }) => {
+test('the clock fits wide glyphs and scaled layouts in both timer views', async ({ page }) => {
+    await page.setViewportSize({ width: 844, height: 620 });
     await page.goto('/');
     await loadSavedTimers(page);
     await page.getByRole('link', { name: new RegExp(longName) }).click();
-    test.skip(!(await page.evaluate(() => document.fullscreenEnabled)), 'Fullscreen API unavailable');
-    await page.locator('#fullscreen-btn').click();
-    await expect(page.locator('#app:fullscreen')).toBeVisible();
-    // Exercise wider glyph metrics than the system font used by the test runner.
     await page.addStyleTag({ content: '.timer-clock { font-family: monospace; letter-spacing: .16em; }' });
 
-    for (const [width, height] of [[1920, 1080], [320, 568], [844, 390], [844, 180], [620, 140], [1180, 820]]) {
+    const clockOverflow = () => page.locator('#timer-display').evaluate(display => {
+        const bounds = display.getBoundingClientRect();
+        const clock = display.querySelector('.timer-clock');
+        const text = document.createRange();
+        text.selectNodeContents(clock);
+        return [...text.getClientRects(), ...[...clock.children].map(part => part.getBoundingClientRect())].some(rect =>
+            rect.left < bounds.left + 4 || rect.right > bounds.right - 4
+        );
+    });
+
+    for (const mode of ['normal', 'minutes', 'seconds']) {
+        await page.locator(`#mode-${mode}-btn`).click();
+        await expect.poll(clockOverflow, `regular layout, ${mode}`).toBe(false);
+    }
+    if (!(await page.evaluate(() => document.fullscreenEnabled))) return;
+
+    await page.locator('#fullscreen-btn').click();
+    await expect(page.locator('#app:fullscreen')).toBeVisible();
+
+    for (const [width, height, scale = 1] of [
+        [1920, 1080], [320, 568], [844, 390, .8], [844, 180], [620, 140], [1180, 820, 1.25]
+    ]) {
         await page.setViewportSize({ width, height });
+        await page.locator('#timer-display').evaluate((display, scale) => { display.style.zoom = scale; }, scale);
         for (const mode of ['normal', 'minutes', 'seconds']) {
             await page.locator(`#mode-${mode}-btn`).evaluate(button => button.click());
+            await expect.poll(clockOverflow, `fullscreen ${width}x${height} scale ${scale}, ${mode}`).toBe(false);
             await expect.poll(() => page.locator('#app').evaluate(app => {
                 const bounds = app.getBoundingClientRect();
                 const overflow = [];
@@ -222,23 +242,13 @@ test('fullscreen clock and controls stay within the available area after resizin
                 if (app.scrollHeight > app.clientHeight + 1) overflow.push('vertical scrolling');
                 const right = bounds.left + app.clientWidth;
                 const bottom = bounds.top + app.clientHeight;
-                const display = app.querySelector('#timer-display');
-                const text = document.createRange();
-                text.selectNodeContents(display.querySelector('.timer-clock'));
-                const displayBounds = display.getBoundingClientRect();
-                for (const rect of text.getClientRects()) {
-                    if (rect.left < displayBounds.left - 1 || rect.right > displayBounds.right + 1) {
-                        overflow.push('clock text extends outside the display');
-                        break;
-                    }
-                }
-                return [...app.querySelectorAll('#timer-view button, .timer-clock-part')]
+                return [...app.querySelectorAll('#timer-view button')]
                     .filter(element => element.checkVisibility())
                     .filter(element => {
                         const rect = element.getBoundingClientRect();
                         return rect.left < bounds.left - 1 || rect.right > right + 1
                             || rect.top < bounds.top - 1 || rect.bottom > bottom + 1;
-                    }).map(element => element.id || element.textContent).concat(overflow);
+                    }).map(element => element.id).concat(overflow);
             }), `${width}x${height}, ${mode}`).toEqual([]);
         }
     }
