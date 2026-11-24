@@ -25,8 +25,7 @@ let createAttempt;
 let creating = false;
 let unstoredLink;
 let audio;
-let displayMode = read('displayMode');
-if (!displayModes.includes(displayMode)) displayMode = 'normal';
+let displayMode = 'normal';
 
 function read(key) {
     try {
@@ -206,7 +205,7 @@ function readLegacyHash(hash) {
     const localId = id.replace(/\/$/, '');
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(localId)) return {};
     const saved = read(`timer_state_${localId}`);
-    return { id: localId, timer: normalizeLegacy(saved, now), displayMode: saved?.displayMode };
+    return { id: localId, timer: normalizeLegacy(saved, now) };
 }
 
 function resetView() {
@@ -222,6 +221,7 @@ function resetView() {
 
 function openRoute() {
     resetView();
+    setDisplayMode('normal');
     const hash = window.location.hash;
     session = null;
     show('landing-view', !hash);
@@ -244,7 +244,6 @@ function openRoute() {
     } else {
         const legacy = readLegacyHash(hash);
         Object.assign(current, { timer: legacy.timer, legacyId: legacy.id, role: 'local' });
-        if (!read('displayMode') && displayModes.includes(legacy.displayMode)) setDisplayMode(legacy.displayMode);
         if (!current.timer) current.connection = 'missing';
     }
     render();
@@ -422,10 +421,10 @@ function renderTime(current, display, valueMs) {
 
     if (!parts || parts.mode !== displayMode || parts.showDays !== showDays) {
         const unit = text => `<span class="timer-unit">${text}</span>`;
-        const dayMarkup = showDays ? '<span class="timer-days" aria-hidden="true"><span data-days></span>일 </span>' : '';
+        const dayMarkup = showDays ? `<span class="timer-clock-part"><span data-days></span>${unit('일')} </span>` : '';
         const minutesMarkup = displayMode === 'minutes' ? `<span class="timer-clock-part"><span data-minutes></span>${unit('분')} </span>` : '';
         const secondsUnit = displayMode === 'normal' ? '' : unit('초');
-        display.innerHTML = `${dayMarkup}<span class="timer-clock" aria-hidden="true">${minutesMarkup}<span class="timer-clock-part"><span data-time></span><span class="timer-ms" data-fraction></span>${secondsUnit}</span></span>`;
+        display.innerHTML = `<span class="timer-clock" aria-hidden="true">${dayMarkup}${minutesMarkup}<span class="timer-clock-part"><span data-time></span><span class="timer-ms" data-fraction></span>${secondsUnit}</span></span>`;
         parts = current.displayParts = {
             mode: displayMode, showDays,
             days: display.querySelector('[data-days]'),
@@ -454,7 +453,11 @@ function renderTime(current, display, valueMs) {
             label = `${minutes}분 ${seconds}초`;
             fit = (digits.length + 2) * 0.65 + 2;
         } else {
-            if (parts.days) setText(parts.days, String(days));
+            if (parts.days) {
+                const digits = String(days);
+                setText(parts.days, digits);
+                fit += digits.length * 0.65 + 0.85;
+            }
             setText(parts.time, clockTime(total));
             label = `${days ? `${days}일 ` : ''}${hours}시간 ${minutes % 60}분 ${seconds}초`;
         }
@@ -889,7 +892,6 @@ el('alarm-btn').onclick = toggleAlarm;
 for (const mode of displayModes) {
     el(`mode-${mode}-btn`).onclick = () => {
         setDisplayMode(mode);
-        write('displayMode', mode);
     };
 }
 el('theme-toggle').onclick = () => {

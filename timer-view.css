@@ -69,9 +69,6 @@
     display: inline-flex;
     align-items: center;
     gap: .425rem;
-    border-radius: 2rem;
-    padding: .375rem .65rem;
-    background: var(--surface-muted);
     color: var(--muted);
 }
 
@@ -82,23 +79,15 @@
 
 .timer-type-label[data-state="running"] {
     color: var(--accent-text);
-    background: var(--accent-soft);
 }
 
 .timer-type-label[data-state="finished"], .timer-status[data-status="offline"],
 .timer-status[data-status="missing"] {
     color: var(--danger);
-    background: var(--danger-soft);
-}
-
-.timer-status {
-    background: var(--surface);
-    border: 1px solid var(--border);
 }
 
 .timer-status[data-status="live"] {
     color: var(--positive);
-    background: var(--positive-soft);
 }
 
 .timer-status::before {
@@ -126,11 +115,10 @@
     block-size: 1rem;
 }
 
-.timer-card {
+.timer-body {
     display: grid;
     gap: clamp(.75rem, 2vw, 1.25rem);
     inline-size: 100%;
-    padding: clamp(.625rem, 2.25vw, 1.5rem);
 }
 
 .timer-face {
@@ -141,12 +129,8 @@
     gap: clamp(.75rem, 2.5vw, 1.25rem);
     min-inline-size: 0;
     min-block-size: clamp(12rem, 34vw, 21.5rem);
-    padding: clamp(.625rem, 2.75vw, 1.75rem);
-    border: 1px solid var(--border);
-    border-radius: calc(var(--radius-card) * .72);
-    background:
-        radial-gradient(circle, color-mix(in srgb, var(--accent-text) 13%, transparent) .75px, transparent 1px) 0 0 / 1.25rem 1.25rem,
-        linear-gradient(145deg, var(--surface-muted), var(--accent-soft) 60%, var(--surface-muted));
+    border-block: 1px solid var(--border);
+    padding-block: 1rem;
     text-align: center;
 }
 
@@ -159,21 +143,40 @@
     inline-size: 100%;
 }
 
-.timer-face .display-mode-container {
-    flex: 0 1 11rem;
-    max-inline-size: 100%;
-    background: var(--surface);
+.display-mode-container {
+    display: flex;
+    gap: .375rem;
 }
 
-.timer-face .display-mode-container button {
-    min-inline-size: min(var(--control-size), 100%);
-    padding-inline: .375rem;
+.display-mode-container button {
+    min-inline-size: var(--control-size);
+    min-block-size: var(--control-size);
+    padding: .25rem;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: .875rem;
 }
 
-.timer-face .display-mode-container button[aria-pressed="true"] {
-    background: var(--accent-soft);
+.display-mode-container button[aria-pressed="true"] {
+    color: var(--accent-text);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: .35em;
+}
+
+.timer-page .secondary-btn:not(:disabled) {
     border-color: transparent;
-    box-shadow: none;
+    background: transparent;
+}
+
+@media (hover: hover) {
+    .display-mode-container button:hover,
+    .timer-page .secondary-btn:hover:not(:disabled) {
+        color: var(--accent-text);
+        text-decoration: underline;
+        text-underline-offset: .25em;
+    }
 }
 
 .timer-display {
@@ -197,22 +200,9 @@
     color: var(--danger);
 }
 
-.timer-days {
-    width: fit-content;
-    max-inline-size: 100%;
-    padding: .375rem .75rem;
-    border-radius: 1rem;
-    background: var(--surface);
-    color: var(--accent-text);
-    font-size: clamp(.875rem, 2.7cqi, 1.375rem);
-    font-weight: 700;
-    letter-spacing: 0;
-    line-height: 1.35;
-}
-
 .timer-clock {
     display: flex;
-    flex-wrap: wrap;
+    white-space: nowrap;
     align-items: baseline;
     justify-content: center;
     gap: .125em .22em;
@@ -244,10 +234,7 @@
 }
 
 .timer-info {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-control);
-    padding: .5rem .75rem;
-    background: var(--surface);
+    color: var(--muted);
     color: var(--muted);
     font-variant-numeric: tabular-nums;
 }
@@ -270,25 +257,20 @@
 
 .timer-tools #alarm-btn[aria-pressed="true"] {
     color: var(--accent-text);
-    background: var(--accent-soft);
 }
 
-.timer-card > .feedback {
+.timer-body > .feedback {
     justify-self: center;
     text-align: center;
 }
 
-.timer-card > .feedback:empty {
+.timer-body > .feedback:empty {
     position: absolute;
 }
 
 @media (max-width: 35rem) {
     .timer-face-toolbar {
         justify-content: center;
-    }
-
-    .timer-face .display-mode-container {
-        flex: 1 0 100%;
     }
 
     .timer-controls > .primary-btn {
