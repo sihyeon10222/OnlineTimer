@@ -200,3 +200,36 @@ test.describe('saved timers on touch', () => {
         await expect(page.getByRole('link', { name: /프로젝트 마감/ })).toBeFocused();
     });
 });
+
+test('fullscreen clock and controls stay within the available area after resizing', async ({ page }) => {
+    await page.goto('/');
+    await loadSavedTimers(page);
+    await page.getByRole('link', { name: new RegExp(longName) }).click();
+    test.skip(!(await page.evaluate(() => document.fullscreenEnabled)), 'Fullscreen API unavailable');
+    await page.locator('#fullscreen-btn').click();
+    await expect(page.locator('#app:fullscreen')).toBeVisible();
+
+    for (const [width, height] of [[1920, 1080], [320, 568], [844, 390], [844, 180], [620, 140], [1180, 820]]) {
+        await page.setViewportSize({ width, height });
+        for (const mode of ['normal', 'minutes', 'seconds']) {
+            await page.locator(`#mode-${mode}-btn`).evaluate(button => button.click());
+            await expect.poll(() => page.locator('#app').evaluate(app => {
+                const bounds = app.getBoundingClientRect();
+                const overflow = [];
+                if (app.scrollWidth > app.clientWidth + 1) overflow.push('horizontal scrolling');
+                if (app.scrollHeight > app.clientHeight + 1) overflow.push('vertical scrolling');
+                const right = bounds.left + app.clientWidth;
+                const bottom = bounds.top + app.clientHeight;
+                return [...app.querySelectorAll('#timer-view button, .timer-clock-part')]
+                    .filter(element => element.checkVisibility())
+                    .filter(element => {
+                        const rect = element.getBoundingClientRect();
+                        return rect.left < bounds.left - 1 || rect.right > right + 1
+                            || rect.top < bounds.top - 1 || rect.bottom > bottom + 1;
+                    }).map(element => element.id || element.textContent).concat(overflow);
+            }), `${width}x${height}, ${mode}`).toEqual([]);
+        }
+    }
+    await page.locator('#fullscreen-btn').click();
+    await expect(page.locator('#app:fullscreen')).toHaveCount(0);
+});
