@@ -48,6 +48,11 @@ function setText(node, value) {
     if (node.textContent !== value) node.textContent = value;
 }
 
+function setActionLabel(buttonId, labelId, label) {
+    setText(el(labelId), label);
+    el(buttonId).title = label;
+}
+
 function show(id, visible) {
     el(id).classList.toggle('hidden', !visible);
 }
@@ -394,9 +399,9 @@ function render() {
     const reading = timer && (!current.isLive || current.clock) && timerReading(timer, nowFor(current));
     setText(el('timer-name-display'), timer?.name || modeNames[timer?.mode] || '타이머');
     show('share-btn', Boolean(timer));
-    setText(el('share-label'), current.isLive ? '보기 링크 복사' : '스냅샷 링크 복사');
+    setActionLabel('share-btn', 'share-label', current.isLive ? '보기 링크 복사' : '스냅샷 링크 복사');
     show('control-link-btn', Boolean(timer && current.allowed));
-    setText(el('control-link-label'), current.role === 'manage' ? '비공개 관리 링크 복사' : '조작 링크 복사');
+    setActionLabel('control-link-btn', 'control-link-label', current.role === 'manage' ? '비공개 관리 링크 복사' : '조작 링크 복사');
     show('promote-btn', Boolean(timer && !current.isLive));
     show('alarm-btn', Boolean(timer && isCountdown(timer)));
     show('fullscreen-btn', Boolean(document.fullscreenEnabled && timer));
@@ -648,7 +653,7 @@ function updateAlarmButton() {
     const enabled = Boolean(audio && audio.state === 'running');
     el('alarm-btn').setAttribute('aria-pressed', enabled);
     el('alarm-icon').setAttribute('href', enabled ? '#icon-bell-off' : '#icon-bell');
-    setText(el('alarm-label'), enabled ? '종료 알림 끄기' : '종료 알림 켜기');
+    setActionLabel('alarm-btn', 'alarm-label', enabled ? '종료 알림 끄기' : '종료 알림 켜기');
 }
 
 async function toggleAlarm() {
@@ -886,7 +891,7 @@ el('fullscreen-btn').onclick = async () => {
 document.addEventListener('fullscreenchange', () => {
     const fullscreen = document.fullscreenElement === el('app');
     el('fullscreen-icon').setAttribute('href', fullscreen ? '#icon-minimize' : '#icon-maximize');
-    setText(el('fullscreen-label'), fullscreen ? '전체 화면 닫기' : '전체 화면');
+    setActionLabel('fullscreen-btn', 'fullscreen-label', fullscreen ? '전체 화면 닫기' : '전체 화면');
 });
 el('alarm-btn').onclick = toggleAlarm;
 for (const mode of displayModes) {

@@ -217,9 +217,9 @@
         </main>
 
         <main id="timer-view" class="view timer-page hidden" aria-labelledby="timer-name-display">
-            <button id="back-to-home" class="timer-back" type="button">
+            <button id="back-to-home" class="timer-back timer-icon-action" type="button" title="타이머 만들기">
                 <svg class="icon" aria-hidden="true"><use href="#icon-back"/></svg>
-                타이머 만들기
+                <span>타이머 만들기</span>
             </button>
             <header class="timer-heading">
                 <div class="timer-heading-copy">
@@ -227,15 +227,19 @@
                     <p id="timer-type-label" class="timer-type-label" role="status"></p>
                 </div>
                 <div class="timer-share-actions" role="group" aria-label="공유 및 화면 설정">
-                    <button id="share-btn" class="secondary-btn hidden" type="button">
+                    <button id="share-btn" class="secondary-btn hidden timer-icon-action" type="button" title="보기 링크 복사">
                         <svg class="icon" aria-hidden="true"><use href="#icon-link"/></svg>
                         <span id="share-label">보기 링크 복사</span>
                     </button>
-                    <button id="control-link-btn" class="secondary-btn hidden" type="button">
+                    <button id="control-link-btn" class="secondary-btn hidden timer-icon-action" type="button" title="조작 링크 복사">
                         <svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>
                         <span id="control-link-label">조작 링크 복사</span>
                     </button>
-                    <button id="fullscreen-btn" class="secondary-btn hidden" type="button">
+                    <button id="alarm-btn" class="secondary-btn hidden timer-icon-action" type="button" title="종료 알림 켜기" aria-pressed="false">
+                        <svg class="icon" aria-hidden="true"><use id="alarm-icon" href="#icon-bell"/></svg>
+                        <span id="alarm-label">종료 알림 켜기</span>
+                    </button>
+                    <button id="fullscreen-btn" class="secondary-btn hidden timer-icon-action" type="button" title="전체 화면">
                         <svg class="icon" aria-hidden="true"><use id="fullscreen-icon" href="#icon-maximize"/></svg>
                         <span id="fullscreen-label">전체 화면</span>
                     </button>
@@ -265,13 +269,13 @@
                         <svg class="icon" aria-hidden="true"><use id="toggle-icon" href="#icon-play"/></svg>
                         <span id="toggle-label">시작</span>
                     </button>
-                    <button id="reset-btn" class="secondary-btn" type="button">
+                    <button id="reset-btn" class="secondary-btn timer-icon-action" type="button" title="초기화">
                         <svg class="icon" aria-hidden="true"><use href="#icon-rotate"/></svg>
-                        초기화
+                        <span>초기화</span>
                     </button>
-                    <button id="restart-btn" class="secondary-btn" type="button">
+                    <button id="restart-btn" class="secondary-btn timer-icon-action" type="button" title="다시 시작">
                         <svg class="icon" aria-hidden="true"><use href="#icon-refresh"/></svg>
-                        다시 시작
+                        <span>다시 시작</span>
                     </button>
                     <button id="change-target-btn" class="primary-btn hidden" type="button">
                         <svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg>
@@ -279,10 +283,6 @@
                     </button>
                 </div>
                 <div class="timer-tools">
-                    <button id="alarm-btn" class="secondary-btn hidden" type="button" aria-pressed="false">
-                        <svg class="icon" aria-hidden="true"><use id="alarm-icon" href="#icon-bell"/></svg>
-                        <span id="alarm-label">종료 알림 켜기</span>
-                    </button>
                     <button id="promote-btn" class="secondary-btn hidden" type="button">
                         <svg class="icon" aria-hidden="true"><use href="#icon-link"/></svg>
                         실시간 링크 만들기

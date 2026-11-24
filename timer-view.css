@@ -305,3 +305,83 @@
         font-size: min(16dvh, 17cqi, calc(95cqi / var(--timer-fit, 5.5)));
     }
 }
+
+.timer-page .timer-icon-action {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    justify-content: center;
+    inline-size: var(--control-size);
+    min-block-size: var(--control-size);
+    margin: 0;
+    padding: 0;
+}
+
+.timer-icon-action > span {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.timer-page .timer-icon-action .icon {
+    inline-size: var(--icon-size);
+    block-size: var(--icon-size);
+}
+
+#app:fullscreen .timer-page {
+    position: relative;
+    align-content: center;
+    min-block-size: 100dvh;
+    max-inline-size: none;
+    padding-block: 3.5rem;
+}
+
+#app:fullscreen {
+    padding-block-end: 0;
+}
+
+#app:fullscreen .timer-heading {
+    position: absolute;
+    inset-block-start: max(.5rem, env(safe-area-inset-top));
+    inset-inline-end: 0;
+    inline-size: auto;
+}
+
+#app:fullscreen :is(
+    .timer-heading-copy, #back-to-home, #share-btn, #control-link-btn,
+    #alarm-btn, #display-modes, #timer-info, .timer-tools, #reset-btn,
+    #change-target-btn, .timer-controls:has(#toggle-btn:not(.hidden)) #restart-btn,
+    #timer-status:is([data-status="live"], [data-status="local"])
+) {
+    display: none;
+}
+
+#app:fullscreen .timer-controls:not(:has(button:not(.hidden):not(#change-target-btn))) {
+    display: none;
+}
+
+#app:fullscreen .timer-face {
+    min-block-size: 0;
+    border: 0;
+    padding: 0;
+}
+
+#app:fullscreen .timer-display {
+    min-block-size: 0;
+    font-size: min(27dvh, 95cqi / var(--timer-fit, 5.5));
+}
+
+#app:fullscreen .timer-face-toolbar {
+    justify-content: center;
+}
+
+#app:fullscreen .timer-face-toolbar:not(:has(#timer-status:not([data-status="live"], [data-status="local"]))) {
+    display: none;
+}
+
+#app:fullscreen .timer-controls > .primary-btn {
+    flex: none;
+}
