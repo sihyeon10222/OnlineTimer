@@ -590,7 +590,7 @@ function handleAlarm(current, reading) {
 }
 
 async function copyLink(hash, privateLink = false) {
-    const url = new URL(window.location.href);
+    const url = new URL(window.location.pathname, window.location.origin);
     url.hash = hash;
     try {
         await navigator.clipboard.writeText(url.href);

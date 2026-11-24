@@ -34,12 +34,15 @@ test('two browser contexts share countdown, reconnect, reopen and keep running w
         const controller = await controllerContext.newPage();
         const viewer = await viewerContext.newPage();
         await viewer.clock.setFixedTime(Date.now() + 5 * 60 * 1000);
-        await controller.goto(baseURL);
+        await controller.goto(new URL('?source=verification', baseURL).href);
         await controller.getByRole('button', { name: '1분', exact: true }).click();
         await controller.locator('#timer-name-input').fill('함께 보는 타이머');
         await controller.getByRole('button', { name: '타이머 생성하기' }).click();
         await expect(liveStatus(controller)).toHaveText('실시간 연결됨');
-        const controlUrl = controller.url();
+        const actualAddress = new URL(controller.url());
+        expect(actualAddress.searchParams.get('source')).toBe('verification');
+        actualAddress.search = '';
+        const controlUrl = actualAddress.href;
         const viewUrl = viewLink(controlUrl);
         await controller.locator('#share-btn').click();
         await expect.poll(() => controller.evaluate(() => navigator.clipboard.readText())).toBe(viewUrl);
