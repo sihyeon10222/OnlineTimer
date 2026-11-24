@@ -121,6 +121,16 @@ for (const [width, height] of viewports) {
             await page.evaluate(() => document.fonts.ready);
             await expect(page.locator('#create-form')).toBeVisible();
             await expectLayout(page, 'initial create form');
+            await expect(page.getByRole('heading', { level: 1 })).toHaveText('새 타이머 만들기');
+            const form = await page.locator('#create-form').boundingBox();
+            const list = await page.locator('#timer-list-section').boundingBox();
+            if (width >= 768) {
+                expect(list.x).toBeGreaterThan(form.x + form.width);
+                expect(list.y).toBeCloseTo(form.y);
+            } else {
+                expect(list.x).toBeCloseTo(form.x);
+                expect(list.y).toBeGreaterThan(form.y + form.height);
+            }
             if (sampleWidths.includes(width)) await capture(page, `${width}-create`);
 
             await page.locator('#mode-target').click();
@@ -153,6 +163,7 @@ for (const [width, height] of viewports) {
             await expectDialog(page, '#copy-dialog', () => page.keyboard.press('Escape'), '#share-btn');
 
             await page.locator('#back-to-home').click();
+            await expect(page.locator('#create-title')).toBeFocused();
             await page.getByRole('link', { name: /프로젝트 마감/ }).click();
             await page.locator('#mode-normal-btn').click();
             await expectLayout(page, 'deadline timer');

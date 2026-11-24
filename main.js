@@ -945,7 +945,7 @@ window.addEventListener('hashchange', () => {
     openRoute();
     window.scrollTo(0, 0);
     if (document.fullscreenElement === el('app')) el('app').scrollTop = 0;
-    el(window.location.hash ? 'timer-name-display' : 'landing-title').focus({ preventScroll: true });
+    el(window.location.hash ? 'timer-name-display' : 'create-title').focus({ preventScroll: true });
 });
 window.addEventListener('offline', () => {
     if (!session?.isLive) return;

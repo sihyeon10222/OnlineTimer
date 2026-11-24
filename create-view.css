@@ -1,120 +1,24 @@
 #landing-view {
-    display: grid;
-    gap: clamp(1rem, 3vw, 1.75rem);
     padding-block-start: clamp(1rem, 3.5vw, 2.25rem);
 }
 
 .landing-grid {
     display: grid;
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     gap: clamp(1rem, 3vw, 1.75rem);
 }
 
-.landing-intro {
-    --clock-size: clamp(10.5rem, 22vw, 14rem);
-
-    display: grid;
-    align-content: center;
-    gap: clamp(1rem, 3vw, 2.25rem);
-    min-inline-size: 0;
-    padding: clamp(1.5rem, 4vw, 2.75rem);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-    background:
-        radial-gradient(ellipse at 82% 94%, var(--accent-soft), transparent 68%),
-        var(--surface-muted);
+@media (min-width: 48rem) {
+    .landing-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    }
 }
 
-.landing-intro-copy {
-    display: grid;
-    gap: 1rem;
-    min-inline-size: 0;
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-}
-
-.landing-intro h1 {
-    font-size: clamp(2.4rem, 5.6vw, 4rem);
-    line-height: 1.07;
-    font-weight: 750;
-    letter-spacing: -0.055em;
-}
-
-.landing-intro p,
 .saved-heading p,
 .timer-list-empty,
 .timer-list-type {
     color: var(--muted);
-}
-
-.landing-intro p {
-    font-size: clamp(0.9rem, 1.6vw, 1.04rem);
-    line-height: 1.65;
-}
-
-.clock-illustration {
-    display: grid;
-    place-items: center;
-    justify-self: center;
-    inline-size: var(--clock-size);
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) 10%, var(--accent-soft));
-    box-shadow:
-        0 0 0 calc(var(--clock-size) * 0.046) color-mix(in srgb, var(--accent) 7%, transparent),
-        0 0 0 calc(var(--clock-size) * 0.09) color-mix(in srgb, var(--accent) 4%, transparent);
-}
-
-.clock-face {
-    position: relative;
-    inline-size: 84%;
-    aspect-ratio: 1;
-    border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
-    border-radius: 50%;
-    background: linear-gradient(145deg, var(--surface), var(--accent-soft));
-    box-shadow: 0 0.35em 0.8em color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-.clock-ticks {
-    position: absolute;
-    inset: 9%;
-    border-radius: inherit;
-    background: repeating-conic-gradient(
-        color-mix(in srgb, var(--accent-text) 42%, transparent) -1deg 1deg,
-        transparent 1deg 29deg
-    );
-    mask-image: radial-gradient(transparent 59%, black 60%);
-}
-
-.clock-minute-hand,
-.clock-hour-hand {
-    position: absolute;
-    inset-block-end: 50%;
-    inset-inline-start: 50%;
-    inline-size: 3.2%;
-    block-size: 34%;
-    border-radius: 100vw;
-    transform: translateX(-50%) rotate(120deg);
-    transform-origin: center bottom;
-    background: var(--accent);
-}
-
-.clock-hour-hand {
-    inline-size: 4%;
-    block-size: 26%;
-    transform: translateX(-50%) rotate(-56deg);
-}
-
-.clock-face::after {
-    position: absolute;
-    inset: 50% auto auto 50%;
-    inline-size: 6.5%;
-    aspect-ratio: 1;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 0.065em var(--accent-soft);
-    content: "";
 }
 
 .create-card,
@@ -126,7 +30,7 @@
     padding: clamp(1rem, 3vw, 2rem);
 }
 
-.create-card h2,
+.create-card h1,
 .timer-list-section h2 {
     font-size: clamp(1.15rem, 2.3vw, 1.45rem);
     line-height: 1.35;
@@ -218,7 +122,6 @@
 
 .timer-list-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
     gap: 0.75rem;
     padding: 0;
     list-style: none;
@@ -326,41 +229,6 @@
 .timer-list-btn:not(.confirming) .delete-confirm-label,
 .timer-list-btn.confirming .icon {
     display: none;
-}
-
-@media (max-width: 49rem) {
-    .intro-copy-break {
-        display: none;
-    }
-}
-
-@media (max-width: 42rem) {
-    .landing-grid {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .landing-intro {
-        --clock-size: clamp(4.5rem, 23vw, 8rem);
-
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: clamp(0.75rem, 4vw, 1.5rem);
-        padding: clamp(1rem, 4vw, 1.75rem);
-    }
-
-    .landing-intro-copy {
-        gap: 0.4rem;
-    }
-
-    .landing-intro h1 {
-        font-size: clamp(1.65rem, 6vw, 2.5rem);
-        letter-spacing: -0.04em;
-        line-height: 1.18;
-    }
-
-    .intro-title-break {
-        display: none;
-    }
 }
 
 @media (max-width: 25rem) {

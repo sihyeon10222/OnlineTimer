@@ -49,24 +49,10 @@
         </header>
 
         <!-- Landing View -->
-        <main id="landing-view" class="view" aria-labelledby="landing-title">
+        <main id="landing-view" class="view" aria-labelledby="create-title">
             <div class="landing-grid">
-                <section class="landing-intro" aria-labelledby="landing-title">
-                    <div class="landing-intro-copy">
-                        <h1 id="landing-title" tabindex="-1">함께 쓰는<br class="intro-title-break"> 타이머</h1>
-                        <p>카운트다운과 스톱워치를 만들고,<br class="intro-copy-break"> 링크로 같은 시간을 공유하세요.</p>
-                    </div>
-                    <div class="clock-illustration" aria-hidden="true">
-                        <div class="clock-face">
-                            <div class="clock-ticks"></div>
-                            <div class="clock-minute-hand"></div>
-                            <div class="clock-hour-hand"></div>
-                        </div>
-                    </div>
-                </section>
-
                 <form id="create-form" class="card create-card" novalidate aria-labelledby="create-title">
-                    <h2 id="create-title">새 타이머 만들기</h2>
+                    <h1 id="create-title" tabindex="-1">새 타이머 만들기</h1>
                     <div class="segmented timer-type-selector" role="group" aria-label="타이머 유형">
                         <button type="button" id="type-countdown" aria-pressed="true">
                             <svg class="icon" aria-hidden="true"><use href="#icon-timer"/></svg>
@@ -185,35 +171,35 @@
                         </button>
                     </div>
                 </form>
-            </div>
 
-            <section id="timer-list-section" class="card timer-list-section" aria-labelledby="saved-title">
-                <div class="saved-heading">
-                    <h2 id="saved-title" tabindex="-1">내 타이머 목록</h2>
-                    <p>이 브라우저에 저장된 타이머를 다시 열 수 있어요.</p>
-                </div>
-                <p id="timer-list-empty" class="timer-list-empty">아직 저장된 타이머가 없어요.</p>
-                <ul id="timer-list-container" class="timer-list-container" role="list"></ul>
-                <template id="timer-list-item-template">
-                    <li class="timer-list-item">
-                        <a class="timer-list-info">
-                            <span class="saved-item-icon">
-                                <svg class="icon" aria-hidden="true"><use href="#icon-timer"/></svg>
-                            </span>
-                            <span class="saved-item-details">
-                                <span class="timer-list-name"></span>
-                                <span class="timer-list-type"></span>
-                                <span class="timer-list-time"></span>
-                            </span>
-                            <svg class="icon saved-item-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg>
-                        </a>
-                        <button type="button" class="icon-btn timer-list-btn delete" aria-label="목록에서 삭제">
-                            <svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>
-                            <span class="delete-confirm-label" aria-hidden="true">삭제</span>
-                        </button>
-                    </li>
-                </template>
-            </section>
+                <section id="timer-list-section" class="card timer-list-section" aria-labelledby="saved-title">
+                    <div class="saved-heading">
+                        <h2 id="saved-title" tabindex="-1">내 타이머 목록</h2>
+                        <p>이 브라우저에 저장된 타이머를 다시 열 수 있어요.</p>
+                    </div>
+                    <p id="timer-list-empty" class="timer-list-empty">아직 저장된 타이머가 없어요.</p>
+                    <ul id="timer-list-container" class="timer-list-container" role="list"></ul>
+                    <template id="timer-list-item-template">
+                        <li class="timer-list-item">
+                            <a class="timer-list-info">
+                                <span class="saved-item-icon">
+                                    <svg class="icon" aria-hidden="true"><use href="#icon-timer"/></svg>
+                                </span>
+                                <span class="saved-item-details">
+                                    <span class="timer-list-name"></span>
+                                    <span class="timer-list-type"></span>
+                                    <span class="timer-list-time"></span>
+                                </span>
+                                <svg class="icon saved-item-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg>
+                            </a>
+                            <button type="button" class="icon-btn timer-list-btn delete" aria-label="목록에서 삭제">
+                                <svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>
+                                <span class="delete-confirm-label" aria-hidden="true">삭제</span>
+                            </button>
+                        </li>
+                    </template>
+                </section>
+            </div>
         </main>
 
         <main id="timer-view" class="view timer-page hidden" aria-labelledby="timer-name-display">
