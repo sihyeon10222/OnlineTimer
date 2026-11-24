@@ -417,10 +417,6 @@ select:focus {
     white-space: nowrap;
 }
 
-.control-btn.full-width {
-    flex: 1 1 100%;
-}
-
 .control-btn.primary {
     background: var(--primary-teal);
     color: white;
@@ -485,21 +481,6 @@ select:focus {
 }
 
 /* Modal Styling */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    animation: fadeIn 0.2s ease-out;
-}
-
 .modal-content {
     width: 90%;
     max-width: 400px;
@@ -615,4 +596,163 @@ select:focus {
     width: 18px;
     height: 18px;
     pointer-events: none;
+}
+#landing-view > main {
+    width: 100%;
+}
+
+.presets,
+.header-actions,
+.timer-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.header-actions {
+    justify-content: flex-end;
+}
+
+.controls {
+    flex-wrap: wrap;
+    margin: 24px auto 12px;
+}
+
+.timer-tools {
+    justify-content: center;
+    margin: 0 auto 12px;
+}
+
+.timer-status,
+.feedback {
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.feedback:empty {
+    display: none;
+}
+
+.timer-status[data-status="live"] {
+    color: var(--active-text);
+    font-weight: 600;
+}
+
+.timer-status[data-status="offline"],
+.timer-display.finished {
+    color: var(--accent-red-text);
+}
+
+#retry-btn {
+    margin-top: 10px;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    transform: none;
+}
+
+button:focus-visible,
+a:focus-visible {
+    outline: 2px solid var(--primary-teal);
+    outline-offset: 3px;
+}
+
+dialog {
+    border: 0;
+    background: transparent;
+    color: var(--text-main);
+    margin: auto;
+    width: min(92%, 400px);
+    overflow: visible;
+}
+
+dialog .modal-content {
+    width: 100%;
+    max-width: none;
+}
+
+dialog::backdrop {
+    background: rgb(0 0 0 / 45%);
+}
+
+.timer-list-info {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+.timer-list-item .timer-list-btn.confirming {
+    background: var(--accent-red);
+    color: var(--accent-red-text);
+    width: auto;
+    padding: 0 8px;
+}
+
+.timer-display > span,
+.timer-display {
+    min-width: 0;
+}
+
+.time-select-group input[type="number"],
+.time-select-group select {
+    min-width: 0;
+    width: 0;
+}
+
+.time-select-group select {
+    flex: 1.35;
+}
+
+#timer-view:fullscreen {
+    background: var(--bg-gray);
+    overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+    #timer-view.view {
+        padding: 0;
+    }
+
+    #timer-view header {
+        gap: 8px;
+    }
+
+    .header-actions .secondary-btn {
+        padding: 8px;
+    }
+
+    .timer-display {
+        font-size: clamp(1.8rem, 11vw, 3.5rem);
+        padding: 0;
+    }
+
+    .timer-container {
+        padding: 0;
+    }
+
+    .controls {
+        gap: 6px;
+    }
+
+    .control-btn {
+        padding: 10px 12px;
+    }
+
+    dialog .modal-content {
+        padding: 22px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .view,
+    .timer-info.waiting {
+        animation: none;
+    }
+}
+
+.control-btn.pause {
+    background: #b92f2f;
 }

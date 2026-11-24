@@ -17,7 +17,7 @@
 
 <body>
     <div id="app">
-        <button id="theme-toggle" class="icon-btn theme-toggle-btn" aria-label="Toggle Dark Mode">
+        <button id="theme-toggle" class="icon-btn theme-toggle-btn" aria-label="어두운 테마 전환">
             <svg id="theme-icon-sun" class="hidden" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
                 viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                 stroke-linejoin="round">
@@ -41,51 +41,57 @@
         <div id="landing-view" class="view">
             <header>
                 <h1>Online Timer</h1>
-                <p>간편한 웹 타이머</p>
+                <p>링크로 함께 보는 실시간 타이머</p>
             </header>
 
-            <main class="card">
+            <main><form id="create-form" class="card" novalidate>
                 <div class="timer-type-selector">
-                    <button id="type-countdown" class="active">타이머</button>
-                    <button id="type-stopwatch">스톱워치</button>
+                    <button type="button" id="type-countdown" class="active">타이머</button>
+                    <button type="button" id="type-stopwatch">스톱워치</button>
                 </div>
 
                 <div id="countdown-settings" class="settings-group">
                     <div class="countdown-mode-selector">
-                        <button id="mode-duration" class="active">시간 설정</button>
-                        <button id="mode-target">종료 시점 설정</button>
+                        <button type="button" id="mode-duration" class="active">시간 설정</button>
+                        <button type="button" id="mode-target">종료 시점 설정</button>
                     </div>
 
                     <div id="duration-input-group" class="input-group">
                         <label>시간 설정</label>
                         <div class="time-select-group">
-                            <input type="number" id="countdown-hours" value="0" min="0" max="99" placeholder="시"
+                            <input type="number" id="countdown-hours" aria-label="시" value="0" min="0" max="99" placeholder="시"
                                 inputmode="numeric">
                             <span>:</span>
-                            <input type="number" id="countdown-minutes" value="10" min="0" max="59" placeholder="분"
+                            <input type="number" id="countdown-minutes" aria-label="분" value="10" min="0" max="59" placeholder="분"
                                 inputmode="numeric">
                             <span>:</span>
-                            <input type="number" id="countdown-seconds" value="0" min="0" max="59" placeholder="초"
+                            <input type="number" id="countdown-seconds" aria-label="초" value="0" min="0" max="59" placeholder="초"
                                 inputmode="numeric">
+                        </div>
+                        <div class="presets" aria-label="빠른 시간 설정">
+                            <button type="button" class="secondary-btn" data-minutes="1">1분</button>
+                            <button type="button" class="secondary-btn" data-minutes="5">5분</button>
+                            <button type="button" class="secondary-btn" data-minutes="10">10분</button>
+                            <button type="button" class="secondary-btn" data-minutes="25">25분</button>
                         </div>
                     </div>
 
                     <div id="target-input-group" class="input-group hidden">
                         <label>종료 시점 설정</label>
                         <div class="datetime-picker-custom">
-                            <input type="date" id="target-date">
+                            <input type="date" id="target-date" aria-label="날짜">
                             <div class="time-select-group">
-                                <select id="target-ampm">
+                                <select id="target-ampm" aria-label="오전 또는 오후">
                                     <option value="AM">AM</option>
                                     <option value="PM">PM</option>
                                 </select>
-                                <input type="number" id="target-hour" min="1" max="12" placeholder="시"
+                                <input type="number" id="target-hour" aria-label="시" min="1" max="12" placeholder="시"
                                     inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="target-minute" min="0" max="59" placeholder="분"
+                                <input type="number" id="target-minute" aria-label="분" min="0" max="59" placeholder="분"
                                     inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="target-second" min="0" max="59" placeholder="초" value="00"
+                                <input type="number" id="target-second" aria-label="초" min="0" max="59" placeholder="초" value="00"
                                     inputmode="numeric">
                             </div>
                         </div>
@@ -94,26 +100,26 @@
 
                 <div id="stopwatch-settings" class="settings-group hidden">
                     <div class="countdown-mode-selector" id="stopwatch-mode-selector">
-                        <button id="sw-mode-immediate" class="active">바로 시작</button>
-                        <button id="sw-mode-target">시작 시점 설정</button>
+                        <button type="button" id="sw-mode-immediate" class="active">바로 시작</button>
+                        <button type="button" id="sw-mode-target">시작 시점 설정</button>
                     </div>
 
                     <div id="sw-target-input-group" class="input-group hidden">
                         <label>시작 시점 설정</label>
                         <div class="datetime-picker-custom">
-                            <input type="date" id="sw-target-date">
+                            <input type="date" id="sw-target-date" aria-label="날짜">
                             <div class="time-select-group">
-                                <select id="sw-target-ampm">
+                                <select id="sw-target-ampm" aria-label="오전 또는 오후">
                                     <option value="AM">AM</option>
                                     <option value="PM">PM</option>
                                 </select>
-                                <input type="number" id="sw-target-hour" min="1" max="12" placeholder="시"
+                                <input type="number" id="sw-target-hour" aria-label="시" min="1" max="12" placeholder="시"
                                     inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="sw-target-minute" min="0" max="59" placeholder="분"
+                                <input type="number" id="sw-target-minute" aria-label="분" min="0" max="59" placeholder="분"
                                     inputmode="numeric">
                                 <span>:</span>
-                                <input type="number" id="sw-target-second" min="0" max="59" placeholder="초" value="00"
+                                <input type="number" id="sw-target-second" aria-label="초" min="0" max="59" placeholder="초" value="00"
                                     inputmode="numeric">
                             </div>
                         </div>
@@ -121,12 +127,13 @@
                 </div>
 
                 <div class="input-group">
-                    <label>이름 (선택)</label>
+                    <label for="timer-name-input">이름 (선택)</label>
                     <input type="text" id="timer-name-input" placeholder="타이머 이름을 입력하세요" maxlength="30">
                 </div>
 
-                <button id="create-btn" class="primary-btn">타이머 생성하기</button>
-            </main>
+                <p id="create-status" class="feedback" role="status"></p>
+                <button id="create-btn" type="submit" class="primary-btn">타이머 생성하기</button>
+            </form></main>
 
             <!-- Timer List Section -->
             <section id="timer-list-section" class="timer-list-section hidden">
@@ -140,7 +147,7 @@
         <div id="timer-view" class="view hidden">
             <header>
                 <div class="header-left">
-                    <button id="back-to-home" class="icon-btn">
+                    <button id="back-to-home" class="icon-btn" aria-label="홈">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                             style="pointer-events: none;">
@@ -149,7 +156,11 @@
                         </svg>
                     </button>
                 </div>
-                <button id="share-btn" class="secondary-btn">링크 복사</button>
+                <div class="header-actions">
+                    <button id="fullscreen-btn" class="secondary-btn hidden">전체 화면</button>
+                    <button id="share-btn" class="secondary-btn hidden">보기 링크 복사</button>
+                    <button id="control-link-btn" class="secondary-btn hidden">조작 링크 복사</button>
+                </div>
             </header>
             <main>
                 <div class="timer-container">
@@ -159,39 +170,48 @@
                         <button id="mode-minutes-btn" class="mode-btn">분</button>
                         <button id="mode-seconds-btn" class="mode-btn">초</button>
                     </div>
-                    <div id="timer-display" class="timer-display">00:00:00</div>
-                    <div id="timer-type-label" class="type-label">카운트다운</div>
+                    <div id="timer-display" class="timer-display" role="timer">00:00:00</div>
+                    <div id="timer-type-label" class="type-label"></div>
+                    <p id="timer-status" class="timer-status" role="status"></p>
+                    <p id="timer-feedback" class="feedback" role="status"></p>
+                    <button id="retry-btn" class="secondary-btn hidden">다시 연결</button>
                 </div>
 
                 <div id="controls" class="controls">
                     <button id="reset-btn" class="control-btn secondary">초기화</button>
+                    <button id="restart-btn" class="control-btn secondary">다시 시작</button>
                     <button id="toggle-btn" class="control-btn primary">시작</button>
                     <button id="change-target-btn" class="control-btn primary hidden">종료 시점 변경</button>
                 </div>
 
-                <div id="timer-info" class="timer-info"></div>
+                <div class="timer-tools">
+                    <button id="alarm-btn" class="secondary-btn hidden" aria-pressed="false">종료 알림 켜기</button>
+                    <button id="promote-btn" class="secondary-btn hidden">실시간 링크 만들기</button>
+                </div>
+                <div id="timer-info" class="timer-info hidden"></div>
             </main>
         </div>
 
         <!-- Change Target Modal -->
-        <div id="change-target-modal" class="modal hidden">
+        <dialog id="change-target-modal" aria-labelledby="target-title">
             <div class="modal-content card">
-                <h3>종료 시점 변경</h3>
-                <p>새로운 종료 시점을 설정하세요.</p>
+                <h3 id="target-title">종료 시점 변경</h3>
+                <p>이 기기의 시간대를 기준으로 설정합니다.</p>
+                <p id="target-feedback" class="feedback" role="status"></p>
 
                 <div class="datetime-picker-custom" style="margin: 20px 0;">
-                    <input type="date" id="new-target-date">
+                    <input type="date" id="new-target-date" aria-label="날짜">
                     <div class="time-select-group">
-                        <select id="new-target-ampm">
+                        <select id="new-target-ampm" aria-label="오전 또는 오후">
                             <option value="AM">AM</option>
                             <option value="PM">PM</option>
                         </select>
-                        <input type="number" id="new-target-hour" min="1" max="12" placeholder="시" inputmode="numeric">
+                        <input type="number" id="new-target-hour" aria-label="시" min="1" max="12" placeholder="시" inputmode="numeric">
                         <span>:</span>
-                        <input type="number" id="new-target-minute" min="0" max="59" placeholder="분"
+                        <input type="number" id="new-target-minute" aria-label="분" min="0" max="59" placeholder="분"
                             inputmode="numeric">
                         <span>:</span>
-                        <input type="number" id="new-target-second" min="0" max="59" placeholder="초" value="00"
+                        <input type="number" id="new-target-second" aria-label="초" min="0" max="59" placeholder="초" value="00"
                             inputmode="numeric">
                     </div>
                 </div>
@@ -201,7 +221,15 @@
                     <button id="confirm-change-btn" class="primary-btn" style="flex: 1;">적용하기</button>
                 </div>
             </div>
-        </div>
+        </dialog>
+        <dialog id="copy-dialog" aria-labelledby="copy-title">
+            <div class="modal-content card">
+                <h3 id="copy-title">링크 복사</h3>
+                <p>아래 링크를 선택해 복사하세요.</p>
+                <input id="copy-value" type="text" aria-label="복사할 링크" readonly>
+                <button id="close-copy" class="secondary-btn">닫기</button>
+            </div>
+        </dialog>
     </div>
     <script type="module" src="/main.js"></script>
 </body>

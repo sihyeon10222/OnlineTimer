@@ -6,17 +6,16 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test": "node --test tests/timer.test.js",
+        "test:e2e": "playwright test",
+        "dev:backend": "convex dev"
     },
     "devDependencies": {
-        "vite": "^5.0.0"
+        "@playwright/test": "^1.65.1",
+        "vite": "^8.3.8"
     },
     "dependencies": {
-        "@vercel/og": "^0.8.6",
-        "firebase": "^10.14.1",
-        "react": "^19.2.4",
-        "react-dom": "^19.2.4",
-        "satori-html": "^0.3.2",
-        "uuid": "^9.0.1"
+        "convex": "^1.51.0"
     }
 }
